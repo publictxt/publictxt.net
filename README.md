@@ -1,24 +1,28 @@
 # PublicTxt.net
-PublicTxt.Net is the .NET implementation of the PublicTxt concept. It provides:
 
+PublicTxt.Net is an in-progress .NET implementation of the [PublicTxt](https://github.com/publictxt/publictext) idea, consisting of:
  - A core library for reading, writing, and syncing Markdown-based PublicTxt instances to Git repositories.
+ - Feature based services
+ - Infrastructure Projects:
+   - Git Repository access and management
+   - Local Database Options
  - Cross-platform clients:
    - Avalonia Desktop App for editing and aggregating knowledge locally. 
    - Blazor Web App for web-based access and collaboration.
- - Services for selective repository subscription, curation, and aggregation.
 
-## Solution 
+## Solution Project Structure
 
 - Core
   - PublicTxt.Core
+- Features
+    - PublicTxt.Wiki
+    - PublicTxt.Community
+    - PublicTxt.Blog
+    - PublicTxt.MetaWeb
 - Infrastructure
   - PublicTxt.Git
   - PublicTxt.Data
-- Features
-  - PublicTxt.Wiki
-  - PublicTxt.Community
-  - PublicTxt.Blog
-  - PublicTxt.MetaWeb
+
 - Apps
   - PublicTxt.Blazor: Web client for interactive editing and viewing.
   - PublicTxt.Avalonia: Cross-platform desktop interface.
