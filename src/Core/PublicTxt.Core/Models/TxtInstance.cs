@@ -19,7 +19,7 @@ public class TxtInstance
     public DateTimeOffset? LastAccessedAt { get; set; }
 
     // Configuration
-    // public TxtInstanceSettings Settings { get; set; }
+    public TxtInstanceSettings Settings { get; set; } = new TxtInstanceSettings();
     
     // Helper Methods
     public bool HasRemoteUrl() => string.IsNullOrEmpty(RemoteUrl);
@@ -29,6 +29,7 @@ public class TxtInstance
     {
         LastAccessedAt = DateTimeOffset.UtcNow;
     }
+    
 }
 
 
