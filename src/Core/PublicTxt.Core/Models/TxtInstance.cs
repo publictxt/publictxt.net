@@ -20,6 +20,15 @@ public class TxtInstance
 
     // Configuration
     // public TxtInstanceSettings Settings { get; set; }
+    
+    // Helper Methods
+    public bool HasRemoteUrl() => string.IsNullOrEmpty(RemoteUrl);
+    public bool HasLocalPath() => !string.IsNullOrEmpty(LocalPath);
+    
+    public void UpdateLastAccessed() 
+    {
+        LastAccessedAt = DateTimeOffset.UtcNow;
+    }
 }
 
 
