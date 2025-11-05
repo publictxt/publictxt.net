@@ -3,7 +3,16 @@
 {
 	"name": "C# (.NET)",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm"
+	"image": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+	"mounts": [
+		"source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
+	],
+	"containerEnv": {
+		"SSH_AUTH_SOCK": "/ssh-agent"
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/git:1": {}
+	}
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
