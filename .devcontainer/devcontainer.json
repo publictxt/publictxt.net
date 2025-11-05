@@ -1,31 +1,38 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/dotnet
 {
-	"name": "C# (.NET)",
-	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
-	"mounts": [
-		"source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
-	],
-	"containerEnv": {
-		"SSH_AUTH_SOCK": "/ssh-agent"
-	},
-	"features": {
-		"ghcr.io/devcontainers/features/git:1": {}
-	}
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [5000, 5001],
-	// "portsAttributes": {
-	//		"5001": {
-	//			"protocol": "https"
-	//		}
-	// }
-	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "dotnet restore",
-	// Configure tool-specific properties.
-	// "customizations": {},
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
+    "name": "C# (.NET)",
+    "image": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+    
+    // Mount SSH agent socket
+    "mounts": [
+        "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind,consistency=cached"
+    ],
+    
+    // Set SSH_AUTH_SOCK inside container
+    "containerEnv": {
+        "SSH_AUTH_SOCK": "/ssh-agent"
+    },
+    
+    // Git feature
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {}
+    },
+    
+    // VS Code extensions
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "eamodio.gitlens",
+                "ms-dotnettools.csharp",
+                "ms-dotnettools.csdevkit"
+            ]
+        }
+    },
+    
+    // Setup Git config after container creation
+    "postCreateCommand": "git config --global user.name 'Jaysen' && git config --global user.email 'jaysen@gmail.com'",
+
+    // Run as root to avoid permission issues
+    "remoteUser": "root"
 }
