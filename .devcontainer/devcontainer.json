@@ -25,7 +25,8 @@
             "extensions": [
                 "eamodio.gitlens",
                 "ms-dotnettools.csharp",
-                "ms-dotnettools.csdevkit"
+                "ms-dotnettools.csdevkit",
+                "ms-dotnettools.vscode-dotnet-pack"
             ]
         }
     },
