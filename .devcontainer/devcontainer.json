@@ -13,27 +13,16 @@
     "containerEnv": {
         "SSH_AUTH_SOCK": "/ssh-agent"
     },
-    
-    // Git feature
-    "features": {
-        "ghcr.io/devcontainers/features/git:1": {}
-    },
-    
+       
     // VS Code extensions
     "customizations": {
         "vscode": {
             "extensions": [
-                "eamodio.gitlens",
                 "ms-dotnettools.csharp",
                 "ms-dotnettools.csdevkit",
                 "ms-dotnettools.vscode-dotnet-pack"
             ]
         }
-    },
+    }
     
-    // Setup Git config after container creation
-    "postCreateCommand": "git config --global user.name 'Jaysen' && git config --global user.email 'jaysen@gmail.com'",
-
-    // Run as root to avoid permission issues
-    "remoteUser": "root"
 }
