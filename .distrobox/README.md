@@ -11,25 +11,26 @@ Simple distrobox setup for .NET development
 # 2. Enter container
 distrobox enter dotnetbox
 
-# 3. Run setup (installs .NET 9 + Avalonia dependencies)
+# 3. Run setup (installs .NET 10 + Avalonia dependencies)
 ./.distrobox/setup.sh
 
 # 4. Optional: Install VS Code (recommended)
 ./.distrobox/install-vscode.sh
 
-# 5. Optional: Install .NET 10 LTS
+# 5. Optional: Install .NET 10 via Microsoft installer (if not in Fedora repos)
 ./.distrobox/install-dotnet10.sh
 ```
 
 **What you get:**
-- .NET 9 SDK (from Fedora repos)
-- .NET 10 SDK (optional, LTS from Microsoft)
+
+- .NET 10 SDK (from Fedora repos)
 - Avalonia GUI dependencies
 
 
 ## Troubleshooting
 
 **GUI apps not displaying:**
+
 ```bash
 echo $DISPLAY  # Should show :0 or similar
 ```
@@ -37,6 +38,6 @@ echo $DISPLAY  # Should show :0 or similar
 ## Files
 
 - `create-container.sh` - Creates container with Universal Blue Fedora image
-- `setup.sh` - Installs .NET 9 + Avalonia dependencies
-- `install-dotnet10.sh` - Optional: Installs .NET 10 LTS
+- `setup.sh` - Installs .NET 10 + Avalonia dependencies
+- `install-dotnet10.sh` - Optional: Installs .NET 10 via Microsoft installer (alternative if not in Fedora repos)
 - `install-vscode.sh` - Optional: Installs VS Code
