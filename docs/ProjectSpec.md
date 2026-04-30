@@ -85,7 +85,14 @@ Feature services are intentionally sparse for now — they exist to scope conten
 
 ### 3.3 PublicTxt Format
 
-PublicTxt content is plain Markdown intended to be compatible with **Obsidian** (wiki-style `[[links]]` and Obsidian DataView attributes). Format details live in the parent repo; `PublicTxt.Core` is responsible for parsing and emitting it.
+PublicTxt content is plain Markdown. The **default on-disk format is md-wiki** (standard Markdown links: `[text](page.md)`), chosen so that an instance can be published directly via GitHub Pages and similar static-site hosts without a conversion step.
+
+**Obsidian compatibility** is still a goal but is handled at the editing edge, not on disk. Two paths to support:
+
+1. **Conversion via [WikiTool](https://github.com/jaysen/WikiTool)** — convert between Obsidian wiki-link syntax (`[[page]]`) and md-wiki (`[page](page.md)`) on import/export.
+2. **Obsidian in Markdown-link mode** — Obsidian can be configured to use standard Markdown links, in which case no conversion is needed.
+
+`PublicTxt.Core` parses and emits md-wiki by default. Format details live in the parent repo; conversion to/from other wiki dialects is delegated to WikiTool (or an integration with it — TBD).
 
 ## 4. Git Infrastructure
 
@@ -145,6 +152,7 @@ Cross-platform desktop client. Out of scope for the initial milestone.
 ## 8. Open Questions
 
 - Topic-branch naming convention.
+- WikiTool integration shape — referenced library, CLI shell-out, or port the converter into Core?
 - Notes content type — owned by Core, or its own feature project?
 - Conflict-resolution UX for origin sync (multiple remotes diverging).
 - How subscription-pulled external content is represented locally (separate worktree? imported into a `subscriptions/` tree? merged?).
