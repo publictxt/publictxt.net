@@ -8,7 +8,7 @@ public class PrimaryRepositoryTests : IDisposable
 
     public PrimaryRepositoryTests()
     {
-        _repoPath = Path.Combine(Path.GetTempPath(), "publictxt-test-primary-" + Guid.NewGuid().ToString("N"));
+        _repoPath = Path.Combine(Path.GetTempPath(), $"publictxt-test-primary-{Guid.NewGuid():N}");
     }
 
     public void Dispose()
@@ -129,8 +129,8 @@ public class ExternalRepositoryTests : IDisposable
     public ExternalRepositoryTests()
     {
         var id = Guid.NewGuid().ToString("N");
-        _sourcePath = Path.Combine(Path.GetTempPath(), "publictxt-test-source-" + id);
-        _externalPath = Path.Combine(Path.GetTempPath(), "publictxt-test-external-" + id);
+        _sourcePath = Path.Combine(Path.GetTempPath(), $"publictxt-test-source-{id}");
+        _externalPath = Path.Combine(Path.GetTempPath(), $"publictxt-test-external-{id}");
     }
 
     public void Dispose()

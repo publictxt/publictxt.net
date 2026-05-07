@@ -146,7 +146,7 @@ public sealed class ExternalRepository : IExternalRepository
     {
         var escaped = System.Text.RegularExpressions.Regex.Escape(pattern)
             .Replace(@"\*\*", ".*")
-            .Replace(@"\*", "[^/\\\\]*")
+            .Replace(@"\*", @"[^/\\]*")
             .Replace(@"\?", ".");
         return $"^{escaped}$";
     }
