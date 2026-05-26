@@ -15,6 +15,9 @@ public interface IExternalRepository : IGitRepository
     /// <summary>Fetches latest changes from the remote without merging.</summary>
     void Fetch(string remote = "origin");
 
+    /// <summary>Lists available remote branches (useful for discovering topic branches).</summary>
+    IEnumerable<string> GetRemoteBranches(string remote = "origin");
+
     /// <summary>Fast-forwards the local branch to match the remote tracking branch.</summary>
     void FastForward(string remote = "origin");
 
