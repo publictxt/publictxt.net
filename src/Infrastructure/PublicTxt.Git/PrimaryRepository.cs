@@ -96,7 +96,7 @@ public sealed class PrimaryRepository : IPrimaryRepository
         Commands.Fetch(repo, remote, refSpecs, null, null);
     }
 
-    public void Pull(GitIdentity merger, string remote = "origin")
+    public GitMergeResult Pull(GitIdentity merger, string remote = "origin")
     {
         using var repo = Open();
         var sig = new Signature(merger.Name, merger.Email, DateTimeOffset.UtcNow);
@@ -104,7 +104,24 @@ public sealed class PrimaryRepository : IPrimaryRepository
         {
             FetchOptions = new FetchOptions()
         };
-        Commands.Pull(repo, sig, pullOptions);
+        
+        var result = Commands.Pull(repo, sig, pullOptions);
+
+        var status = result.Status switch
+        {
+            MergeStatus.UpToDate => GitMergeStatus.UpToDate,
+            MergeStatus.FastForward => GitMergeStatus.FastForward,
+            MergeStatus.Conflicts => GitMergeStatus.Conflicts,
+            _ => GitMergeStatus.Merged
+        };
+
+        IEnumerable<string>? conflictedFiles = null;
+        if (status == GitMergeStatus.Conflicts)
+        {
+            conflictedFiles = repo.Index.Conflicts.Select(c => c.Ours.Path).Distinct().ToList();
+        }
+
+        return new GitMergeResult(status, result.Commit?.Sha, conflictedFiles);
     }
 
     public void Push(string remote = "origin")
