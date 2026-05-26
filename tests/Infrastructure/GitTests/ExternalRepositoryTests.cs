@@ -194,4 +194,15 @@ public class ExternalRepositoryTests : IDisposable
         var ex = Record.Exception(() => ext.CloneOrUpdate(_sourcePath));
         Assert.Null(ex);
     }
+
+    [Fact]
+    public void FastForward_ThrowsInvalidOperationException_WhenRemoteDoesNotExist()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => ext.FastForward("missing"));
+        Assert.Contains("Remote 'missing' not found", ex.Message);
+    }
 }

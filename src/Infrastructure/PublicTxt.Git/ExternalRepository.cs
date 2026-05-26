@@ -93,11 +93,14 @@ public sealed class ExternalRepository : IExternalRepository
     public void FastForward(string remote = "origin")
     {
         using var repo = Open();
-        var trackingBranch = repo.Head.TrackedBranch
-            ?? throw new InvalidOperationException(
-                $"Branch '{repo.Head.FriendlyName}' has no tracking branch.");
+        var ffRemote = repo.Network.Remotes[remote]
+            ?? throw new InvalidOperationException($"Remote '{remote}' not found.");
 
-        var mergeResult = repo.Merge(trackingBranch, new Signature("system", "system@localhost", DateTimeOffset.UtcNow),
+        var remoteBranch = repo.Branches[$"{ffRemote.Name}/{repo.Head.FriendlyName}"]
+            ?? throw new InvalidOperationException(
+                $"Remote branch '{ffRemote.Name}/{repo.Head.FriendlyName}' not found.");
+
+        var mergeResult = repo.Merge(remoteBranch, new Signature("system", "system@localhost", DateTimeOffset.UtcNow),
             new MergeOptions { FastForwardStrategy = FastForwardStrategy.FastForwardOnly });
 
         if (mergeResult.Status == MergeStatus.Conflicts)
