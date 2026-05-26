@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitTests", "tests\Core\GitTests\GitTests.csproj", "{4BD205DE-B4DA-4E84-9AD1-8FCF9963D887}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitTests", "tests\Infrastructure\GitTests\GitTests.csproj", "{4BD205DE-B4DA-4E84-9AD1-8FCF9963D887}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PublicTxt.Git", "src\Infrastructure\PublicTxt.Git\PublicTxt.Git.csproj", "{B67EB105-0746-4E87-A5AB-24E733DC2313}"
 EndProject

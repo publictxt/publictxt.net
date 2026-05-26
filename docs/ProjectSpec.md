@@ -24,7 +24,7 @@ This document specifies the .NET solution: its libraries, services, infrastructu
 
 ## 2. Solution Layout
 
-```
+```bash
 src/
   Core/
     PublicTxt.Core              — domain models, parsing, content services
@@ -122,7 +122,7 @@ The instance can also **subscribe to external PublicTxt repositories** and pull 
 
 The following abstractions are anticipated; exact shapes will emerge as the implementation lands:
 
-- `IOriginRepository` — operations on the instance's own working copy and its origin remote(s).
+- `IPrimaryRepository` — operations on the instance's own working copy and its origin remote(s).
 - `IExternalRepository` — read-only operations against a subscribed external repo.
 - `ISubscriptionFilter` — encapsulates the rules for which content from an external repo gets pulled.
 - `IGitCredentials` — credential resolution (SSH key, PAT, etc.), provider-agnostic.
