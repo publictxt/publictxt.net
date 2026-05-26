@@ -164,15 +164,10 @@ public sealed class ExternalRepository : IExternalRepository
     private string ResolvePathWithinRepository(string relativePath)
     {
         var rootPath = Path.GetFullPath(LocalPath);
-        if (!rootPath.EndsWith(Path.DirectorySeparatorChar))
-            rootPath += Path.DirectorySeparatorChar;
-
         var candidatePath = Path.GetFullPath(Path.Combine(rootPath, relativePath));
-        var comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
+        var relative = Path.GetRelativePath(rootPath, candidatePath);
 
-        if (!candidatePath.StartsWith(rootPath, comparison))
+        if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
             throw new UnauthorizedAccessException("Path escapes repository root.");
 
         return candidatePath;

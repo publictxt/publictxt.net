@@ -85,6 +85,17 @@ public class ExternalRepositoryTests : IDisposable
     }
 
     [Fact]
+    public void ReadFile_ReturnsContent_ForNestedPathWithinRepository()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        var content = ext.ReadFile(Path.Combine("blog", "post1.md"));
+        Assert.Equal("# Post 1", content);
+    }
+
+    [Fact]
     public void ReadFile_ThrowsFileNotFoundException_ForMissingFile()
     {
         CreateSourceRepo();
@@ -110,6 +121,27 @@ public class ExternalRepositoryTests : IDisposable
         {
             var traversalPath = Path.Combine("..", outsideFileName);
             Assert.Throws<UnauthorizedAccessException>(() => ext.ReadFile(traversalPath));
+        }
+        finally
+        {
+            if (File.Exists(outsideFilePath))
+                File.Delete(outsideFilePath);
+        }
+    }
+
+    [Fact]
+    public void ReadFile_ThrowsUnauthorizedAccessException_ForAbsolutePath()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        var outsideFilePath = Path.Combine(Path.GetTempPath(), $"outside-abs-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(outsideFilePath, "secret");
+
+        try
+        {
+            Assert.Throws<UnauthorizedAccessException>(() => ext.ReadFile(outsideFilePath));
         }
         finally
         {
