@@ -6,63 +6,19 @@ namespace PublicTxt.Git;
 /// LibGit2Sharp-backed implementation of <see cref="IPrimaryRepository"/>.
 /// Manages the primary (owned) git repository for a PublicTxt instance.
 /// </summary>
-public sealed class PrimaryRepository : IPrimaryRepository
+public sealed class PrimaryRepository(string localPath) : GitRepositoryBase(localPath), IPrimaryRepository
 {
-    public string LocalPath { get; }
-
-    public PrimaryRepository(string localPath)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
-        LocalPath = localPath;
-    }
-
-    public bool IsInitialized =>
-        Directory.Exists(LocalPath) && Repository.IsValid(LocalPath);
-
-    public string? CurrentBranch
-    {
-        get
-        {
-            if (!IsInitialized) return null;
-            using var repo = Open();
-            return repo.Head.FriendlyName;
-        }
-    }
-
-    public GitCommitInfo? LatestCommit
-    {
-        get
-        {
-            if (!IsInitialized) return null;
-            using var repo = Open();
-            var tip = repo.Head.Tip;
-            return tip is null ? null : MapCommit(tip);
-        }
-    }
-
-    public GitRepositoryStatus GetStatus()
-    {
-        if (!IsInitialized) return GitRepositoryStatus.Clean;
-        using var repo = Open();
-        var status = repo.RetrieveStatus();
-        return new GitRepositoryStatus(
-            IsClean: !status.IsDirty,
-            StagedCount: status.Staged.Count(),
-            UnstagedCount: status.Modified.Count() + status.Missing.Count(),
-            UntrackedCount: status.Untracked.Count());
-    }
 
     public void Init()
     {
         Directory.CreateDirectory(LocalPath);
-        LibGit2Sharp.Repository.Init(LocalPath);
+        Repository.Init(LocalPath);
     }
 
     public void Clone(string remoteUrl, CloneOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(remoteUrl);
-        var cloneOptions = BuildCloneOptions(options);
-        LibGit2Sharp.Repository.Clone(remoteUrl, LocalPath, cloneOptions);
+        Repository.Clone(remoteUrl, LocalPath, BuildCloneOptions(options));
     }
 
     public void StageAll()
@@ -123,9 +79,7 @@ public sealed class PrimaryRepository : IPrimaryRepository
 
         IEnumerable<string>? conflictedFiles = null;
         if (status == GitMergeStatus.Conflicts)
-        {
             conflictedFiles = repo.Index.Conflicts.Select(c => c.Ours.Path).Distinct().ToList();
-        }
 
         return new GitMergeResult(status, result.Commit?.Sha, conflictedFiles);
     }
@@ -135,7 +89,7 @@ public sealed class PrimaryRepository : IPrimaryRepository
         using var repo = Open();
         var pushRemote = repo.Network.Remotes[remote]
             ?? throw new InvalidOperationException($"Remote '{remote}' not found.");
-        repo.Network.Push(pushRemote, repo.Head.CanonicalName, (LibGit2Sharp.PushOptions?)null);
+        repo.Network.Push(pushRemote, repo.Head.CanonicalName, (PushOptions?)null);
     }
 
     public void Checkout(string branchName)
@@ -145,26 +99,5 @@ public sealed class PrimaryRepository : IPrimaryRepository
         var branch = repo.Branches[branchName]
             ?? throw new InvalidOperationException($"Branch '{branchName}' not found.");
         Commands.Checkout(repo, branch);
-    }
-
-    // ── helpers ──────────────────────────────────────────────────────────────
-
-    private Repository Open() => new(LocalPath);
-
-    private static GitCommitInfo MapCommit(Commit commit) =>
-        new(
-            Sha: commit.Sha,
-            Message: commit.MessageShort,
-            Author: new GitIdentity(commit.Author.Name, commit.Author.Email),
-            AuthoredAt: commit.Author.When);
-
-    private static LibGit2Sharp.CloneOptions BuildCloneOptions(CloneOptions? options)
-    {
-        var lo = new LibGit2Sharp.CloneOptions();
-        if (options?.BranchName is { } branch)
-            lo.BranchName = branch;
-        if (options is not null)
-            lo.Checkout = options.Checkout;
-        return lo;
     }
 }
