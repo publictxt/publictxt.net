@@ -80,6 +80,16 @@ public sealed class ExternalRepository : IExternalRepository
         Commands.Fetch(repo, remote, refSpecs, null, null);
     }
 
+    public IEnumerable<string> GetRemoteBranches(string remote = "origin")
+    {
+        if (!IsInitialized) return Enumerable.Empty<string>();
+        using var repo = Open();
+        return repo.Branches
+            .Where(b => b.IsRemote && b.RemoteName == remote)
+            .Select(b => b.FriendlyName)
+            .ToList();
+    }
+
     public void FastForward(string remote = "origin")
     {
         using var repo = Open();
