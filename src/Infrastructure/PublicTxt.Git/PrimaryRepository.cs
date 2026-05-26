@@ -99,13 +99,19 @@ public sealed class PrimaryRepository : IPrimaryRepository
     public GitMergeResult Pull(GitIdentity merger, string remote = "origin")
     {
         using var repo = Open();
+        var pullRemote = repo.Network.Remotes[remote]
+            ?? throw new InvalidOperationException($"Remote '{remote}' not found.");
+
+        var refSpecs = pullRemote.FetchRefSpecs.Select(r => r.Specification);
+        Commands.Fetch(repo, remote, refSpecs, null, null);
+
+        var head = repo.Head;
+        var remoteBranch = repo.Branches[$"{remote}/{head.FriendlyName}"]
+            ?? throw new InvalidOperationException(
+                $"Remote branch '{remote}/{head.FriendlyName}' not found.");
+
         var sig = new Signature(merger.Name, merger.Email, DateTimeOffset.UtcNow);
-        var pullOptions = new LibGit2Sharp.PullOptions
-        {
-            FetchOptions = new FetchOptions()
-        };
-        
-        var result = Commands.Pull(repo, sig, pullOptions);
+        var result = repo.Merge(remoteBranch, sig);
 
         var status = result.Status switch
         {

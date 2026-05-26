@@ -118,4 +118,19 @@ public class PrimaryRepositoryTests : IDisposable
         repo.Checkout("feature");
         Assert.Equal("feature", repo.CurrentBranch);
     }
+
+    [Fact]
+    public void Pull_ThrowsInvalidOperationException_WhenRemoteDoesNotExist()
+    {
+        var repo = new PrimaryRepository(_repoPath);
+        repo.Init();
+        File.WriteAllText(Path.Combine(_repoPath, "a.txt"), "a");
+        repo.StageAll();
+        repo.Commit("init", new GitIdentity("Bot", "bot@example.com"));
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => repo.Pull(new GitIdentity("Bot", "bot@example.com"), remote: "missing"));
+
+        Assert.Contains("Remote 'missing' not found", ex.Message);
+    }
 }
