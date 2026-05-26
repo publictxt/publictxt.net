@@ -107,7 +107,7 @@ public sealed class ExternalRepository : IExternalRepository
     public string ReadFile(string relativePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
-        var fullPath = Path.Combine(LocalPath, relativePath.TrimStart('/', '\\'));
+        var fullPath = ResolvePathWithinRepository(relativePath);
         if (!File.Exists(fullPath))
             throw new FileNotFoundException($"File not found in repository: {relativePath}", fullPath);
         return File.ReadAllText(fullPath);
@@ -159,5 +159,22 @@ public sealed class ExternalRepository : IExternalRepository
             .Replace(@"\*", @"[^/\\]*")
             .Replace(@"\?", ".");
         return $"^{escaped}$";
+    }
+
+    private string ResolvePathWithinRepository(string relativePath)
+    {
+        var rootPath = Path.GetFullPath(LocalPath);
+        if (!rootPath.EndsWith(Path.DirectorySeparatorChar))
+            rootPath += Path.DirectorySeparatorChar;
+
+        var candidatePath = Path.GetFullPath(Path.Combine(rootPath, relativePath));
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        if (!candidatePath.StartsWith(rootPath, comparison))
+            throw new UnauthorizedAccessException("Path escapes repository root.");
+
+        return candidatePath;
     }
 }

@@ -95,6 +95,30 @@ public class ExternalRepositoryTests : IDisposable
     }
 
     [Fact]
+    public void ReadFile_ThrowsUnauthorizedAccessException_ForPathTraversal()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        var parentDir = Directory.GetParent(_externalPath)!.FullName;
+        var outsideFileName = $"outside-{Guid.NewGuid():N}.txt";
+        var outsideFilePath = Path.Combine(parentDir, outsideFileName);
+        File.WriteAllText(outsideFilePath, "secret");
+
+        try
+        {
+            var traversalPath = Path.Combine("..", outsideFileName);
+            Assert.Throws<UnauthorizedAccessException>(() => ext.ReadFile(traversalPath));
+        }
+        finally
+        {
+            if (File.Exists(outsideFilePath))
+                File.Delete(outsideFilePath);
+        }
+    }
+
+    [Fact]
     public void ListFiles_ReturnsAllTrackedFiles()
     {
         CreateSourceRepo();
