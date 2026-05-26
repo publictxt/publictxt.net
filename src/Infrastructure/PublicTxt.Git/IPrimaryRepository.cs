@@ -24,7 +24,7 @@ public interface IPrimaryRepository : IGitRepository
     void Fetch(string remote = "origin");
 
     /// <summary>Pulls (fetch + merge/rebase) from the tracked remote branch.</summary>
-    void Pull(GitIdentity merger, string remote = "origin");
+    GitMergeResult Pull(GitIdentity merger, string remote = "origin");
 
     /// <summary>Pushes committed changes to the tracked remote branch.</summary>
     void Push(string remote = "origin");
@@ -32,3 +32,17 @@ public interface IPrimaryRepository : IGitRepository
     /// <summary>Checks out an existing branch.</summary>
     void Checkout(string branchName);
 }
+
+public enum GitMergeStatus
+{
+    UpToDate,
+    FastForward,
+    Conflicts,
+    Merged
+}
+
+public record GitMergeResult(
+    GitMergeStatus Status, 
+    string? CommitHash, 
+    IEnumerable<string>? ConflictedFiles = null
+);
