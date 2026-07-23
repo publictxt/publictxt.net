@@ -22,7 +22,7 @@ public class TxtInstance
     public TxtInstanceSettings Settings { get; set; } = new TxtInstanceSettings();
     
     // Helper Methods
-    public bool HasRemoteUrl() => string.IsNullOrEmpty(RemoteUrl);
+    public bool HasRemoteUrl() => !string.IsNullOrEmpty(RemoteUrl);
     public bool HasLocalPath() => !string.IsNullOrEmpty(LocalPath);
     
     public void UpdateLastAccessed() 
