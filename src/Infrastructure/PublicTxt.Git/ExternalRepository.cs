@@ -6,52 +6,13 @@ namespace PublicTxt.Git;
 /// LibGit2Sharp-backed implementation of <see cref="IExternalRepository"/>.
 /// Provides read-only access and sync operations for third-party PublicTxt instances.
 /// </summary>
-public sealed class ExternalRepository : IExternalRepository
+public sealed class ExternalRepository : GitRepositoryBase, IExternalRepository
 {
-    public string LocalPath { get; }
     public string? RemoteUrl { get; private set; }
 
-    public ExternalRepository(string localPath, string? remoteUrl = null)
+    public ExternalRepository(string localPath, string? remoteUrl = null) : base(localPath)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
-        LocalPath = localPath;
         RemoteUrl = remoteUrl;
-    }
-
-    public bool IsInitialized =>
-        Directory.Exists(LocalPath) && Repository.IsValid(LocalPath);
-
-    public string? CurrentBranch
-    {
-        get
-        {
-            if (!IsInitialized) return null;
-            using var repo = Open();
-            return repo.Head.FriendlyName;
-        }
-    }
-
-    public GitCommitInfo? LatestCommit
-    {
-        get
-        {
-            if (!IsInitialized) return null;
-            using var repo = Open();
-            var tip = repo.Head.Tip;
-            return tip is null ? null : MapCommit(tip);
-        }
-    }
-
-    public GitRepositoryStatus GetStatus()
-    {
-        if (!IsInitialized) return GitRepositoryStatus.Clean;
-        using var repo = Open();
-        var status = repo.RetrieveStatus();
-        return new GitRepositoryStatus(
-            IsClean: !status.IsDirty,
-            StagedCount: status.Staged.Count(),
-            UnstagedCount: status.Modified.Count() + status.Missing.Count(),
-            UntrackedCount: status.Untracked.Count());
     }
 
     public void CloneOrUpdate(string remoteUrl, CloneOptions? options = null)
@@ -67,8 +28,7 @@ public sealed class ExternalRepository : IExternalRepository
         }
 
         Directory.CreateDirectory(LocalPath);
-        var cloneOptions = BuildCloneOptions(options);
-        Repository.Clone(remoteUrl, LocalPath, cloneOptions);
+        Repository.Clone(remoteUrl, LocalPath, BuildCloneOptions(options));
     }
 
     public void Fetch(string remote = "origin")
@@ -100,7 +60,8 @@ public sealed class ExternalRepository : IExternalRepository
             ?? throw new InvalidOperationException(
                 $"Remote branch '{ffRemote.Name}/{repo.Head.FriendlyName}' not found.");
 
-        var mergeResult = repo.Merge(remoteBranch, new Signature("system", "system@localhost", DateTimeOffset.UtcNow),
+        var mergeResult = repo.Merge(remoteBranch,
+            new Signature("system", "system@localhost", DateTimeOffset.UtcNow),
             new MergeOptions { FastForwardStrategy = FastForwardStrategy.FastForwardOnly });
 
         if (mergeResult.Status == MergeStatus.Conflicts)
@@ -135,25 +96,6 @@ public sealed class ExternalRepository : IExternalRepository
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
-
-    private Repository Open() => new(LocalPath);
-
-    private static GitCommitInfo MapCommit(Commit commit) =>
-        new(
-            Sha: commit.Sha,
-            Message: commit.MessageShort,
-            Author: new GitIdentity(commit.Author.Name, commit.Author.Email),
-            AuthoredAt: commit.Author.When);
-
-    private static LibGit2Sharp.CloneOptions BuildCloneOptions(CloneOptions? options)
-    {
-        var lo = new LibGit2Sharp.CloneOptions();
-        if (options?.BranchName is { } branch)
-            lo.BranchName = branch;
-        if (options is not null)
-            lo.Checkout = options.Checkout;
-        return lo;
-    }
 
     private static string GlobToRegex(string pattern)
     {
