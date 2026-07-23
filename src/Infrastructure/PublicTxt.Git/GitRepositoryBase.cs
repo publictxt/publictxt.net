@@ -36,12 +36,14 @@ public abstract class GitRepositoryBase : IGitRepository
         }
     }
 
-    public GitRepositoryStatus GetStatus()
+    public WorkingTreeStatus GetStatus()
     {
-        if (!IsInitialized) return GitRepositoryStatus.Clean;
+        if (!IsInitialized)
+            throw new InvalidOperationException($"Repository at '{LocalPath}' is not initialized.");
+
         using var repo = Open();
         var status = repo.RetrieveStatus();
-        return new GitRepositoryStatus(
+        return new WorkingTreeStatus(
             IsClean: !status.IsDirty,
             StagedCount: status.Staged.Count(),
             UnstagedCount: status.Modified.Count() + status.Missing.Count(),

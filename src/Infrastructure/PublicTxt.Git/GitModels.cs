@@ -11,15 +11,11 @@ public sealed record GitCommitInfo(
 public sealed record GitIdentity(string Name, string Email);
 
 /// <summary>Summary of the working-directory and index state.</summary>
-public sealed record GitRepositoryStatus(
+public sealed record WorkingTreeStatus(
     bool IsClean,
     int StagedCount,
     int UnstagedCount,
-    int UntrackedCount)
-{
-    public static GitRepositoryStatus Clean { get; } =
-        new GitRepositoryStatus(IsClean: true, 0, 0, 0);
-}
+    int UntrackedCount);
 
 /// <summary>Options used when cloning a remote repository.</summary>
 public sealed record CloneOptions(

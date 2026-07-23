@@ -90,6 +90,13 @@ public class PrimaryRepositoryTests : IDisposable
     }
 
     [Fact]
+    public void GetStatus_ThrowsInvalidOperationException_BeforeInit()
+    {
+        var repo = new PrimaryRepository(_repoPath);
+        Assert.Throws<InvalidOperationException>(() => repo.GetStatus());
+    }
+
+    [Fact]
     public void GetStatus_ReflectsUntracked_WhenFileAdded()
     {
         var repo = new PrimaryRepository(_repoPath);

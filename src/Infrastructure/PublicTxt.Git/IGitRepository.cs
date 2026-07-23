@@ -18,5 +18,6 @@ public interface IGitRepository
     GitCommitInfo? LatestCommit { get; }
 
     /// <summary>Returns a summary of the working-directory and index status.</summary>
-    GitRepositoryStatus GetStatus();
+    /// <exception cref="InvalidOperationException">The repository is not initialized.</exception>
+    WorkingTreeStatus GetStatus();
 }
