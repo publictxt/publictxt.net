@@ -18,8 +18,7 @@ public class ExternalRepositoryTests : IDisposable
     {
         foreach (var path in new[] { _sourcePath, _externalPath })
         {
-            if (Directory.Exists(path))
-                Directory.Delete(path, recursive: true);
+            GitTestHelpers.DeleteDirectory(path);
         }
     }
 

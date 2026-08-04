@@ -13,8 +13,7 @@ public class PrimaryRepositoryTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_repoPath))
-            Directory.Delete(_repoPath, recursive: true);
+        GitTestHelpers.DeleteDirectory(_repoPath);
     }
 
     [Fact]
