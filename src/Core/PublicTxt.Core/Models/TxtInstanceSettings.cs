@@ -6,7 +6,7 @@ public class TxtInstanceSettings
     public string BlogPath { get; set; } = "blog";
     public string WikiPath { get; set; } = "wiki";
     public string NotesPath { get; set; } = "notes";
-    public string MetaWebPath { get; set; } = "metaweb";
+    public string BookmarksPath { get; set; } = "bookmarks";
     public string MediaPath { get; set; } = "media";
     public string TagsPath { get; set; } = "tags";
     public string IndexesPath { get; set; } = "indexes";
@@ -73,7 +73,7 @@ public class TxtInstanceSettings
         yield return (nameof(BlogPath), BlogPath);
         yield return (nameof(WikiPath), WikiPath);
         yield return (nameof(NotesPath), NotesPath);
-        yield return (nameof(MetaWebPath), MetaWebPath);
+        yield return (nameof(BookmarksPath), BookmarksPath);
         yield return (nameof(MediaPath), MediaPath);
         yield return (nameof(TagsPath), TagsPath);
         yield return (nameof(IndexesPath), IndexesPath);

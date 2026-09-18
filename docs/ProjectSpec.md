@@ -12,7 +12,7 @@ This document specifies the .NET solution: its libraries, services, infrastructu
 
 - Provide a reusable **core library** for reading, writing, and reasoning about a PublicTxt instance (a local working copy of a Git repository containing PublicTxt-formatted content).
 - Provide **Git infrastructure** that lets a PublicTxt instance sync with one or more remotes, and selectively aggregate content from external repos.
-- Provide **feature services** that handle the distinct content types (wiki, blog, community, metaweb).
+- Provide **feature services** that handle the distinct content types (wiki, blog, community, bookmarks).
 - Provide **client applications** (desktop, web, CLI) built on those services.
 - Stay **provider-agnostic** — speak standard Git only; no GitHub/GitLab API dependencies in core.
 
@@ -32,7 +32,7 @@ src/
     PublicTxt.Wiki              — wiki content service        (placeholder)
     PublicTxt.Blog              — blog content service        (placeholder)
     PublicTxt.Community         — community content service   (placeholder)
-    PublicTxt.MetaWeb           — metaweb content service     (placeholder)
+    PublicTxt.Bookmarks         — bookmarks content service   (placeholder)
   Infrastructure/
     PublicTxt.Git               — Git abstractions over LibGit2Sharp
     PublicTxt.Data              — local persistence            (placeholder)
@@ -74,7 +74,7 @@ A PublicTxt instance contains several content types, each rooted at a settings-c
 | Blog        | `blog`      | `PublicTxt.Blog`      |
 | Wiki        | `wiki`      | `PublicTxt.Wiki`      |
 | Notes       | `notes`     | `PublicTxt.Core` (TBD) |
-| MetaWeb     | `metaweb`   | `PublicTxt.MetaWeb`   |
+| Bookmarks   | `bookmarks` | `PublicTxt.Bookmarks` |
 | Community   | `community` | `PublicTxt.Community` |
 | Media       | `media`     | `PublicTxt.Core`      |
 | Tags        | `tags`      | `PublicTxt.Core`      |
