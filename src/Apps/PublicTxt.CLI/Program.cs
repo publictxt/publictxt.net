@@ -1,3 +1,3 @@
-﻿// See https://aka.ms/new-console-template for more information
+using PublicTxt.CLI;
 
-Console.WriteLine("Hello, World!");
+return new CliApp(Console.Out, Console.Error).Run(args);
