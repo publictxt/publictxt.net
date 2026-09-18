@@ -56,3 +56,7 @@ nunit-*.xml
 # Agent instructions
 .claude/
 .vs
+
+# IDE user state
+.idea/
+*.DotSettings.user
