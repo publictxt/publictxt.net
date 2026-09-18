@@ -133,7 +133,7 @@ Out of scope for the initial milestone. When introduced, it will provide a local
 
 ## 6. Feature Services — Placeholders
 
-Each of `PublicTxt.Wiki`, `PublicTxt.Blog`, `PublicTxt.Community`, and `PublicTxt.MetaWeb` will own the read/write/query logic for its content type. Details deferred. They depend only on `PublicTxt.Core`.
+Each of `PublicTxt.Wiki`, `PublicTxt.Blog`, `PublicTxt.Community`, and `PublicTxt.Bookmarks` will own the read/write/query logic for its content type. Details deferred. They depend only on `PublicTxt.Core`.
 
 ## 7. Applications
 
@@ -163,6 +163,6 @@ Cross-platform desktop client. Out of scope for the initial milestone.
 1. **M1 — Git foundation.** `PublicTxt.Git` with origin sync (single remote): clone, fetch, pull, push, commit, status. Wired into `TxtInstance` lifecycle.
 2. **M2 — Core content read.** Parse and enumerate Markdown content per `TxtInstanceSettings` paths. CLI commands to inspect an instance.
 3. **M3 — External subscriptions.** Subscribe to a remote PublicTxt repo with simple filters.
-4. **M4 — Feature services.** Flesh out Wiki / Blog / MetaWeb / Community APIs.
+4. **M4 — Feature services.** Flesh out Wiki / Blog / Bookmarks / Community APIs.
 5. **M5 — Persistence.** Introduce `PublicTxt.Data` for local cache/search.
 6. **M6 — Clients.** Avalonia and Blazor apps.
