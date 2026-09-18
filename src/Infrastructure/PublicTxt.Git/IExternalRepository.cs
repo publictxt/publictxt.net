@@ -15,6 +15,15 @@ public interface IExternalRepository : IGitRepository
     /// <summary>Lists available remote branches (useful for discovering topic branches).</summary>
     IEnumerable<string> GetRemoteBranches(string remote = "origin");
 
+    /// <summary>
+    /// Ensures the clone exists and its working tree is at the tip of <c>origin/&lt;branch&gt;</c>
+    /// (the remote's default branch when null), fetching first. Unlike <see cref="CloneOrUpdate"/> this
+    /// resets rather than fast-forwards, so it copes with force-pushed or switched branches; the clone is
+    /// treated as a disposable cache. Returns the resulting commit SHA.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The branch does not exist on the remote.</exception>
+    string UpdateToBranch(string remoteUrl, string? branch);
+
     /// <summary>Fast-forwards the local branch to match the remote tracking branch.</summary>
     /// <exception cref="InvalidOperationException">The remote or remote branch does not exist, or the branches have diverged.</exception>
     void FastForward(string remote = "origin");

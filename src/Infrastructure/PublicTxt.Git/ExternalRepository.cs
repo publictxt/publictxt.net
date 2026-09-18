@@ -33,6 +33,53 @@ public sealed class ExternalRepository : GitRepositoryBase, IExternalRepository
         Repository.Clone(remoteUrl, LocalPath, BuildCloneOptions(options));
     }
 
+    public string UpdateToBranch(string remoteUrl, string? branch)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remoteUrl);
+        RemoteUrl = remoteUrl;
+
+        if (!IsInitialized)
+        {
+            Directory.CreateDirectory(LocalPath);
+            try
+            {
+                Repository.Clone(remoteUrl, LocalPath, BuildCloneOptions(new CloneOptions(BranchName: branch)));
+            }
+            catch (LibGit2SharpException ex) when (branch is not null && ex.Message.Contains(branch, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"Branch '{branch}' not found on remote '{remoteUrl}'.", ex);
+            }
+        }
+        else
+        {
+            Fetch();
+        }
+
+        using var repo = Open();
+        var name = branch ?? DefaultRemoteBranch(repo) ?? repo.Head.FriendlyName;
+        var remoteBranch = repo.Branches[$"origin/{name}"]
+            ?? throw new InvalidOperationException($"Branch '{name}' not found on remote '{remoteUrl}'.");
+
+        var local = repo.Branches[name] ?? repo.CreateBranch(name, remoteBranch.Tip);
+        if (!ReferenceEquals(repo.Head, local) && repo.Head.FriendlyName != name)
+            Commands.Checkout(repo, local, new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
+
+        repo.Reset(ResetMode.Hard, remoteBranch.Tip);
+        repo.Branches.Update(local, b => b.TrackedBranch = remoteBranch.CanonicalName);
+        return remoteBranch.Tip.Sha;
+    }
+
+    private static string? DefaultRemoteBranch(Repository repo)
+    {
+        if (repo.Refs["refs/remotes/origin/HEAD"] is SymbolicReference sym)
+        {
+            const string prefix = "refs/remotes/origin/";
+            var target = sym.TargetIdentifier;
+            return target.StartsWith(prefix, StringComparison.Ordinal) ? target[prefix.Length..] : null;
+        }
+        return null;
+    }
+
     public IEnumerable<string> GetRemoteBranches(string remote = "origin")
     {
         if (!IsInitialized) return Enumerable.Empty<string>();
