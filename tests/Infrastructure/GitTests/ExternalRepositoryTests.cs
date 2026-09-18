@@ -22,15 +22,37 @@ public class ExternalRepositoryTests : IDisposable
         }
     }
 
-    private void CreateSourceRepo()
+    private static readonly GitIdentity OriginIdentity = new("Origin", "origin@example.com");
+
+    private PrimaryRepository CreateSourceRepo()
     {
         var primary = new PrimaryRepository(_sourcePath);
         primary.Init();
         Directory.CreateDirectory(Path.Combine(_sourcePath, "blog"));
         File.WriteAllText(Path.Combine(_sourcePath, "index.txt"), "hello publictxt");
+        File.WriteAllText(Path.Combine(_sourcePath, "README.md"), "# Root readme");
         File.WriteAllText(Path.Combine(_sourcePath, "blog", "post1.md"), "# Post 1");
         primary.StageAll();
-        primary.Commit("initial", new GitIdentity("Origin", "origin@example.com"));
+        primary.Commit("initial", OriginIdentity);
+        return primary;
+    }
+
+    /// <summary>Adds a commit on a new topic branch in the source repo, then returns to the original branch.</summary>
+    private void AddTopicBranchToSource(string branchName, string filePath, string content)
+    {
+        using var raw = new LibGit2Sharp.Repository(_sourcePath);
+        var original = raw.Head.FriendlyName;
+        var topic = raw.Branches.Add(branchName, raw.Head.Tip);
+        LibGit2Sharp.Commands.Checkout(raw, topic);
+
+        var fullPath = Path.Combine(_sourcePath, filePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        File.WriteAllText(fullPath, content);
+        LibGit2Sharp.Commands.Stage(raw, filePath);
+        var sig = new LibGit2Sharp.Signature(OriginIdentity.Name, OriginIdentity.Email, DateTimeOffset.UtcNow);
+        raw.Commit($"topic: {branchName}", sig, sig, new LibGit2Sharp.CommitOptions());
+
+        LibGit2Sharp.Commands.Checkout(raw, raw.Branches[original]);
     }
 
     [Fact]
@@ -203,5 +225,143 @@ public class ExternalRepositoryTests : IDisposable
 
         var ex = Assert.Throws<InvalidOperationException>(() => ext.FastForward("missing"));
         Assert.Contains("Remote 'missing' not found", ex.Message);
+    }
+
+    // ── glob ─────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ListFiles_RecursiveGlob_IncludesRootLevelFiles()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        var markdownFiles = ext.ListFiles("**/*.md").ToList();
+
+        Assert.Contains("README.md", markdownFiles);
+        Assert.Contains("blog/post1.md", markdownFiles);
+        Assert.DoesNotContain("index.txt", markdownFiles);
+    }
+
+    [Fact]
+    public void ListFiles_DirectoryGlob_ReturnsOnlyThatDirectory()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        var blogFiles = ext.ListFiles("blog/**").ToList();
+
+        Assert.Equal(new[] { "blog/post1.md" }, blogFiles);
+    }
+
+    // ── update / fast-forward ────────────────────────────────────────────────
+
+    [Fact]
+    public void CloneOrUpdate_SecondCall_FastForwardsNewCommits()
+    {
+        var source = CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+        var firstSha = ext.LatestCommit!.Sha;
+
+        File.WriteAllText(Path.Combine(_sourcePath, "wiki.md"), "# Wiki");
+        source.StageAll();
+        var second = source.Commit("add wiki", OriginIdentity);
+
+        ext.CloneOrUpdate(_sourcePath);
+
+        Assert.NotEqual(firstSha, ext.LatestCommit!.Sha);
+        Assert.Equal(second.Sha, ext.LatestCommit.Sha);
+        Assert.Equal("# Wiki", ext.ReadFile("wiki.md"));
+    }
+
+    [Fact]
+    public void GetRemoteBranches_ListsTopicBranches()
+    {
+        CreateSourceRepo();
+        AddTopicBranchToSource("topic/recipes", "wiki/recipes.md", "# Recipes");
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        var branches = ext.GetRemoteBranches().ToList();
+
+        Assert.Contains("origin/topic/recipes", branches);
+    }
+
+    // ── reading at a reference ───────────────────────────────────────────────
+
+    [Fact]
+    public void ReadFileAt_ReadsFromBranchWithoutCheckout()
+    {
+        CreateSourceRepo();
+        AddTopicBranchToSource("topic/recipes", "wiki/recipes.md", "# Recipes");
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+        var branchBefore = ext.CurrentBranch;
+
+        var content = ext.ReadFileAt("origin/topic/recipes", "wiki/recipes.md");
+
+        Assert.Equal("# Recipes", content);
+        Assert.Equal(branchBefore, ext.CurrentBranch);
+        Assert.False(File.Exists(Path.Combine(_externalPath, "wiki", "recipes.md")));
+    }
+
+    [Fact]
+    public void ReadFileAt_AcceptsBackslashPaths()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        var content = ext.ReadFileAt("HEAD", @"blog\post1.md");
+
+        Assert.Equal("# Post 1", content);
+    }
+
+    [Fact]
+    public void ReadFileAt_ThrowsFileNotFound_ForMissingFile()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        Assert.Throws<FileNotFoundException>(() => ext.ReadFileAt("HEAD", "nope.md"));
+    }
+
+    [Fact]
+    public void ReadFileAt_ThrowsInvalidOperation_ForUnknownReference()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        Assert.Throws<InvalidOperationException>(() => ext.ReadFileAt("origin/does-not-exist", "index.txt"));
+    }
+
+    [Fact]
+    public void ReadFileAt_ThrowsUnauthorizedAccess_ForPathTraversal()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        Assert.Throws<UnauthorizedAccessException>(() => ext.ReadFileAt("HEAD", "../outside.txt"));
+    }
+
+    [Fact]
+    public void ListFilesAt_ListsTopicBranchFiles_WithGlob()
+    {
+        CreateSourceRepo();
+        AddTopicBranchToSource("topic/recipes", "wiki/recipes.md", "# Recipes");
+        var ext = new ExternalRepository(_externalPath);
+        ext.CloneOrUpdate(_sourcePath);
+
+        var topicFiles = ext.ListFilesAt("origin/topic/recipes", "**/*.md").ToList();
+        var headFiles = ext.ListFilesAt("HEAD", "**/*.md").ToList();
+
+        Assert.Contains("wiki/recipes.md", topicFiles);
+        Assert.Contains("README.md", topicFiles);
+        Assert.DoesNotContain("wiki/recipes.md", headFiles);
     }
 }
