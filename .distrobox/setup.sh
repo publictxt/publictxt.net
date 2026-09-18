@@ -8,8 +8,8 @@ echo "🔧 Setting up .NET GUI development environment..."
 
 # Install .NET SDK if not already installed
 if ! command -v dotnet &> /dev/null; then
-    echo "📦 Installing .NET SDK 9.0..."
-    sudo dnf install -y dotnet-sdk-9.0 dotnet-runtime-9.0
+    echo "📦 Installing .NET SDK 10.0..."
+    sudo dnf install -y dotnet-sdk-10.0 dotnet-runtime-10.0
 else
     echo "✅ .NET SDK already installed: $(dotnet --version)"
 fi
