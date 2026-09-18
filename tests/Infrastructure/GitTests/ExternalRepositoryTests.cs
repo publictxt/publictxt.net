@@ -289,6 +289,75 @@ public class ExternalRepositoryTests : IDisposable
         Assert.Contains("origin/topic/recipes", branches);
     }
 
+    // ── UpdateToBranch ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void UpdateToBranch_ClonesDefaultBranch_WhenBranchNull()
+    {
+        var source = CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+
+        var sha = ext.UpdateToBranch(_sourcePath, null);
+
+        Assert.Equal(source.LatestCommit!.Sha, sha);
+        Assert.Equal(source.CurrentBranch, ext.CurrentBranch);
+        Assert.Equal("hello publictxt", ext.ReadFile("index.txt"));
+    }
+
+    [Fact]
+    public void UpdateToBranch_ChecksOutTopicBranch_AndSwitchesBackAndForth()
+    {
+        CreateSourceRepo();
+        AddTopicBranchToSource("topic/recipes", "wiki/recipes.md", "# Recipes");
+        var ext = new ExternalRepository(_externalPath);
+
+        ext.UpdateToBranch(_sourcePath, "topic/recipes");
+        Assert.Equal("topic/recipes", ext.CurrentBranch);
+        Assert.True(File.Exists(Path.Combine(_externalPath, "wiki", "recipes.md")));
+
+        ext.UpdateToBranch(_sourcePath, null);
+        Assert.NotEqual("topic/recipes", ext.CurrentBranch);
+        Assert.False(File.Exists(Path.Combine(_externalPath, "wiki", "recipes.md")));
+        Assert.True(ext.GetStatus().IsClean);
+    }
+
+    [Fact]
+    public void UpdateToBranch_PicksUpNewCommits_AndSurvivesForcePush()
+    {
+        var source = CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+        ext.UpdateToBranch(_sourcePath, null);
+
+        File.WriteAllText(Path.Combine(_sourcePath, "new.md"), "# New");
+        source.StageAll();
+        var second = source.Commit("second", OriginIdentity);
+        Assert.Equal(second.Sha, ext.UpdateToBranch(_sourcePath, null));
+        Assert.Equal("# New", ext.ReadFile("new.md"));
+
+        // Rewrite history on the source: reset to the first commit and add a different one.
+        using (var raw = new LibGit2Sharp.Repository(_sourcePath))
+        {
+            raw.Reset(LibGit2Sharp.ResetMode.Hard, raw.Head.Tip.Parents.First());
+        }
+        File.WriteAllText(Path.Combine(_sourcePath, "other.md"), "# Other");
+        source.StageAll();
+        var rewritten = source.Commit("rewritten", OriginIdentity);
+
+        Assert.Equal(rewritten.Sha, ext.UpdateToBranch(_sourcePath, null));
+        Assert.False(File.Exists(Path.Combine(_externalPath, "new.md")));
+        Assert.Equal("# Other", ext.ReadFile("other.md"));
+    }
+
+    [Fact]
+    public void UpdateToBranch_Throws_ForMissingBranch()
+    {
+        CreateSourceRepo();
+        var ext = new ExternalRepository(_externalPath);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => ext.UpdateToBranch(_sourcePath, "nope"));
+        Assert.Contains("nope", ex.Message);
+    }
+
     // ── reading at a reference ───────────────────────────────────────────────
 
     [Fact]

@@ -156,6 +156,23 @@ public sealed partial class CliApp
                 ("content", catalog.Items.Count == 0 ? "(none)" : string.Join(", ", counts)),
                 ("tags", catalog.Tags.Count.ToString()),
                 ("broken links", catalog.BrokenLinks.Count().ToString()));
+
+            if (isInstance)
+            {
+                var subs = new SubscriptionService(root).List();
+                if (subs.Count > 0)
+                {
+                    _out.WriteLine();
+                    var subService = new SubscriptionService(root, ResolveCredentials(parse));
+                    var summary = subs.Select(s =>
+                    {
+                        if (!subService.IsCached(s)) return $"{s.Name} (not fetched)";
+                        try { return $"{s.Name} {subService.Enumerate(s).Count()}"; }
+                        catch (InvalidOperationException) { return $"{s.Name} (error)"; }
+                    });
+                    WriteKeyValues(("subscriptions", string.Join(", ", summary)));
+                }
+            }
             return ExitOk;
         }));
         return cmd;

@@ -128,9 +128,12 @@ Implemented (see `src/Infrastructure/PublicTxt.Git`):
 - `IGitCredentials` — provider-agnostic credential resolution, threaded through every network call. Implementations: static token, environment variable (`PUBLICTXT_GIT_TOKEN`), delegate. **Only HTTPS username/token is supported**; the LibGit2Sharp native binaries are built without libssh2, so SSH would need a separate git-CLI adapter.
 - `TxtInstanceGitService` — bridges `TxtInstance` and `IPrimaryRepository`: initialise (clone or init), refresh status, sync.
 
-Anticipated (M3):
+Subscriptions (M3):
 
-- `ISubscriptionFilter` — encapsulates the rules for which content from an external repo gets pulled.
+- `Subscription` / `SubscriptionFilter` (Core) — name, remote URL, optional branch, and a filter of content types, include/exclude path globs and include/exclude tags. Criteria are ANDed, values within a criterion ORed.
+- `SubscriptionStore` (Core) — persists the list at `settings/subscriptions.json`, committed with the instance.
+- `AggregateCatalog` (Core) — local items plus filtered subscribed items, each carrying a `Source`; a failing subscription is reported, not fatal.
+- `SubscriptionService` (Git) — one read-only clone per subscription under `<instance>/.publictxt/subscriptions/<name>` (git-ignored). Add clones before persisting; update hard-resets each cache to the followed branch so force pushes and branch switches are harmless.
 
 Decisions recorded: pull/sync merge rather than rebase; `TxtInstance` stays a plain model and lifecycle lives in services.
 
@@ -159,6 +162,9 @@ Command-line entry point for batch operations, scripting, and headless use. Asse
 | `commit -m` | Stage all and commit |
 | `sync [-m]` | Commit (if `-m`), fetch, merge, push; exit 2 on conflicts |
 | `publish [--branch gh-pages]` | Push the current branch to a Pages-style branch |
+| `subscriptions add <url> [--name] [--branch] [--type] [--include] [--exclude] [--tag] [--exclude-tag]` | Subscribe and fetch |
+| `subscriptions list` / `update [name]` / `remove <name>` | Manage subscriptions |
+| `list --all [--search] [--timeline]` | Aggregate view across local and subscribed content |
 
 All commands take `--path`/`-C`. Author: `--author "Name <email>"`, then `PUBLICTXT_AUTHOR_NAME`/`_EMAIL`, then git config. Credentials: `--token` or `PUBLICTXT_GIT_TOKEN` (HTTPS only). See [CLAUDE.md](../CLAUDE.md) for details.
 
@@ -177,7 +183,7 @@ Cross-platform desktop client. Out of scope for the initial milestone.
 - Notes content type — owned by Core, or its own feature project? (Parsing already lives in Core; a Notes feature project is only needed if notes gain behaviour beyond plain pages.)
 - Resolved (M2): **tags** come from both front matter `tags` and inline `#tag`, merged case-insensitively. **Settings** are JSON at `settings/instance.json`.
 - Conflict-resolution UX for origin sync. (Infrastructure now reports conflicts via `GitSyncResult.HasConflicts` / `GitStatus.Conflicted` and never auto-resolves; the UX is a client concern.)
-- How subscription-pulled external content is represented locally (separate worktree? imported into a `subscriptions/` tree? merged?).
+- Resolved (M3): subscribed content lives in **separate read-only clones outside the instance's tracked tree** (`.publictxt/subscriptions/`, git-ignored) and the aggregate view is computed. Importing selected pages into the instance and committing them remains a possible later feature.
 - Credential storage strategy across CLI / desktop / web. (`IGitCredentials` is the seam; CLI will start with the `PUBLICTXT_GIT_TOKEN` environment resolver.)
 - SSH support: not possible through LibGit2Sharp's bundled binaries. Options if needed: a git-CLI adapter, or HTTPS tokens only.
 
@@ -185,7 +191,7 @@ Cross-platform desktop client. Out of scope for the initial milestone.
 
 1. **M1 — Git foundation.** ✅ Done 2026-09-18. `PublicTxt.Git` with origin sync (single remote): clone, fetch, pull, push, commit, status, credentials, sync cycle. Wired into `TxtInstance` via `TxtInstanceGitService`.
 2. **M2 — Core content read.** ✅ Done 2026-09-19. Markdig-based parsing, instance layout and JSON settings, content catalog with link resolution and backlinks. `publictxt` CLI with init/clone/status/list/show/links/commit/sync/publish.
-3. **M3 — External subscriptions.** Subscribe to a remote PublicTxt repo with simple filters.
+3. **M3 — External subscriptions.** ✅ Done 2026-09-19. Subscriptions with type/path/tag filters and branch following, per-subscription caches, aggregate view, CLI commands.
 4. **M4 — Feature services.** Flesh out Wiki / Blog / Bookmarks / Community APIs.
 5. **M5 — Persistence.** Introduce `PublicTxt.Data` for local cache/search.
 6. **M6 — Clients.** Avalonia and Blazor apps.

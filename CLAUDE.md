@@ -38,7 +38,15 @@ publictxt links [--all]                                broken links (exit 1 if a
 publictxt commit -m "…"                                stage all + commit
 publictxt sync [-m "…"]                                commit (if -m), pull, push; exit 2 on conflicts
 publictxt publish [--branch gh-pages]                  push current branch to a Pages branch
+
+publictxt subscriptions add <url> [--name n] [--branch b]
+    [--type wiki|blog|…] [--include glob] [--exclude glob]
+    [--tag t] [--exclude-tag t]                        subscribe and fetch (alias: subs)
+publictxt subscriptions list|update [name]|remove <name>
+publictxt list --all [--search text] [--timeline]     local + subscribed content, with a source column
 ```
+
+Subscription caches live under `<instance>/.publictxt/subscriptions/<name>` (git-ignored); the subscription list is `settings/subscriptions.json` and is meant to be committed.
 
 All commands accept `--path`/`-C <dir>` (default: current directory). Author comes from `--author "Name <email>"`, then `PUBLICTXT_AUTHOR_NAME`/`PUBLICTXT_AUTHOR_EMAIL`, then git config. HTTPS token from `--token` or `PUBLICTXT_GIT_TOKEN`. SSH remotes are not supported (LibGit2Sharp lacks libssh2).
 
