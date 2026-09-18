@@ -11,7 +11,8 @@ public sealed class ExternalRepository : GitRepositoryBase, IExternalRepository
 {
     public string? RemoteUrl { get; private set; }
 
-    public ExternalRepository(string localPath, string? remoteUrl = null) : base(localPath)
+    public ExternalRepository(string localPath, string? remoteUrl = null, IGitCredentials? credentials = null)
+        : base(localPath, credentials)
     {
         RemoteUrl = remoteUrl;
     }
