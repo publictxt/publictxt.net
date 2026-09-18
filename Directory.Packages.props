@@ -8,6 +8,7 @@
   <ItemGroup>
     <!-- Infrastructure -->
     <PackageVersion Include="LibGit2Sharp" Version="0.32.0" />
+    <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.12" />
 
     <!-- Testing -->
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
