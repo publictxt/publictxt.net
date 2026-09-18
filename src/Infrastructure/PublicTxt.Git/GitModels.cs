@@ -15,7 +15,25 @@ public sealed record WorkingTreeStatus(
     bool IsClean,
     int StagedCount,
     int UnstagedCount,
-    int UntrackedCount);
+    int UntrackedCount,
+    int ConflictedCount = 0)
+{
+    public bool HasConflicts => ConflictedCount > 0;
+}
+
+/// <summary>Outcome of a combined commit → fetch → merge → push cycle.</summary>
+/// <param name="Committed">The commit created from local changes, or null if nothing was committed.</param>
+/// <param name="Pulled">The merge result, or null when the remote branch did not exist yet.</param>
+/// <param name="Pushed">Whether a push was performed.</param>
+/// <param name="Tracking">Tracking status after the cycle.</param>
+public sealed record GitSyncResult(
+    GitCommitInfo? Committed,
+    GitMergeResult? Pulled,
+    bool Pushed,
+    TrackingStatus Tracking)
+{
+    public bool HasConflicts => Pulled?.Status == GitMergeStatus.Conflicts;
+}
 
 /// <summary>
 /// Relationship between the current branch and its upstream (remote tracking) branch.

@@ -32,6 +32,19 @@ public interface IPrimaryRepository : IGitRepository
     /// <exception cref="InvalidOperationException">The remote does not exist or the branch has no commits.</exception>
     void Push(string remote = "origin");
 
+    /// <summary>
+    /// Runs one sync cycle: optionally commit local changes, fetch, merge the remote branch if it
+    /// exists, and push if there is anything to publish. Stops before pushing when the merge conflicts.
+    /// </summary>
+    /// <param name="identity">Author for the commit and any merge commit.</param>
+    /// <param name="commitMessage">If supplied and the working tree is dirty, all changes are staged and committed with this message.</param>
+    /// <param name="remote">Remote name.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The working tree is dirty and no <paramref name="commitMessage"/> was given, the remote does not exist,
+    /// or the branch has no commits.
+    /// </exception>
+    GitSyncResult Sync(GitIdentity identity, string? commitMessage = null, string remote = "origin");
+
     /// <summary>Checks out an existing local branch.</summary>
     /// <exception cref="InvalidOperationException">The branch does not exist.</exception>
     void Checkout(string branchName);

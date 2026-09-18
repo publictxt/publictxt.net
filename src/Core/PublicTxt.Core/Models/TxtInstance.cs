@@ -44,11 +44,20 @@ public enum InstanceStatus
 
 public enum GitStatus
 {
+    /// <summary>No information yet, or the instance has no upstream to compare against.</summary>
     Unknown,
+    /// <summary>Working tree clean and level with the upstream branch.</summary>
     Synced,
+    /// <summary>Uncommitted or unpushed local work; upstream has nothing new.</summary>
     LocalChanges,
+    /// <summary>Upstream has commits not yet pulled; no local work.</summary>
     RemoteChanges,
+    /// <summary>Both local work and unpulled upstream commits.</summary>
     Diverged,
+    /// <summary>A merge left conflicts in the working tree that need resolving.</summary>
+    Conflicted,
+    /// <summary>A sync is in progress.</summary>
     Syncing,
+    /// <summary>The last git operation failed.</summary>
     Error
 }

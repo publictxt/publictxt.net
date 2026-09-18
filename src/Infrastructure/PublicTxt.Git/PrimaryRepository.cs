@@ -52,18 +52,54 @@ public sealed class PrimaryRepository(string localPath, IGitCredentials? credent
 
     public GitMergeResult Pull(GitIdentity merger, string remote = "origin")
     {
+        Fetch(remote);
+        return MergeRemoteBranch(merger, remote)
+            ?? throw new InvalidOperationException(
+                $"Remote branch '{remote}/{CurrentBranch}' not found.");
+    }
+
+    public GitSyncResult Sync(GitIdentity identity, string? commitMessage = null, string remote = "origin")
+    {
         EnsureInitialized();
 
-        using var repo = Open();
-        var pullRemote = RequireRemote(repo, remote);
+        GitCommitInfo? committed = null;
+        var tree = GetStatus();
+        if (!tree.IsClean)
+        {
+            if (commitMessage is null)
+                throw new InvalidOperationException(
+                    "Working tree has uncommitted changes; supply a commit message or commit first.");
+            StageAll();
+            committed = Commit(commitMessage, identity);
+        }
 
-        var refSpecs = pullRemote.FetchRefSpecs.Select(r => r.Specification);
-        Commands.Fetch(repo, remote, refSpecs, BuildFetchOptions(), null);
+        Fetch(remote);
+
+        var pulled = MergeRemoteBranch(identity, remote);
+        if (pulled?.Status == GitMergeStatus.Conflicts)
+            return new GitSyncResult(committed, pulled, Pushed: false, GetTrackingStatus());
+
+        var tracking = GetTrackingStatus();
+        var pushed = false;
+        if (!tracking.IsTracking || tracking.Ahead > 0)
+        {
+            Push(remote);
+            pushed = true;
+        }
+
+        return new GitSyncResult(committed, pulled, pushed, GetTrackingStatus());
+    }
+
+    /// <summary>Merges <c>remote/&lt;current branch&gt;</c> into HEAD. Returns null if that remote branch does not exist.</summary>
+    private GitMergeResult? MergeRemoteBranch(GitIdentity merger, string remote)
+    {
+        using var repo = Open();
+        RequireRemote(repo, remote);
 
         var head = repo.Head;
-        var remoteBranch = repo.Branches[$"{remote}/{head.FriendlyName}"]
-            ?? throw new InvalidOperationException(
-                $"Remote branch '{remote}/{head.FriendlyName}' not found.");
+        var remoteBranch = repo.Branches[$"{remote}/{head.FriendlyName}"];
+        if (remoteBranch is null)
+            return null;
 
         var sig = new Signature(merger.Name, merger.Email, DateTimeOffset.UtcNow);
         var result = repo.Merge(remoteBranch, sig);
