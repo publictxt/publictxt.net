@@ -26,6 +26,14 @@ public sealed class ContentItem
 
     public DateTimeOffset? ModifiedAt { get; init; }
 
+    /// <summary>
+    /// Where the item came from: null for the local instance, otherwise the subscription name.
+    /// Set by the aggregate view, not by the parser.
+    /// </summary>
+    public string? Source { get; init; }
+
+    public bool IsLocal => Source is null;
+
     public string FileName => RelativePath[(RelativePath.LastIndexOf('/') + 1)..];
 
     /// <summary>Directory part of <see cref="RelativePath"/> (forward slashes, no trailing slash, empty at root).</summary>
@@ -42,5 +50,20 @@ public sealed class ContentItem
 
     public bool HasTag(string tag) => Tags.Contains(tag, StringComparer.OrdinalIgnoreCase);
 
-    public override string ToString() => $"{Type}: {RelativePath}";
+    /// <summary>Copy of this item attributed to <paramref name="source"/>.</summary>
+    public ContentItem WithSource(string? source) => new()
+    {
+        RelativePath = RelativePath,
+        Type = Type,
+        Title = Title,
+        FrontMatter = FrontMatter,
+        Tags = Tags,
+        Links = Links,
+        Body = Body,
+        Date = Date,
+        ModifiedAt = ModifiedAt,
+        Source = source
+    };
+
+    public override string ToString() => Source is null ? $"{Type}: {RelativePath}" : $"{Type}: {Source}:{RelativePath}";
 }
