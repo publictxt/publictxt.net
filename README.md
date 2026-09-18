@@ -19,7 +19,7 @@ PublicTxt.Net is an in-progress .NET implementation of the [PublicTxt](https://g
   - PublicTxt.Wiki
   - PublicTxt.Community
   - PublicTxt.Blog
-  - PublicTxt.MetaWeb
+  - PublicTxt.Bookmarks
 - Infrastructure
   - PublicTxt.Git
   - PublicTxt.Data
