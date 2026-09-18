@@ -1,0 +1,14 @@
+{
+  "blogPath": "blog",
+  "wikiPath": "wiki",
+  "notesPath": "notes",
+  "bookmarksPath": "bookmarks",
+  "mediaPath": "media",
+  "tagsPath": "tags",
+  "indexesPath": "indexes",
+  "communityPath": "community",
+  "settingsPath": "settings",
+  "autoSync": false,
+  "syncIntervalMinutes": 15,
+  "defaultBranch": "main"
+}
