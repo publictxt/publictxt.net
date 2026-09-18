@@ -218,6 +218,91 @@ public class PrimaryRepositoryRemoteTests : IDisposable
         Assert.Contains("origin/topic/new", ex.Message);
     }
 
+    // ── sync ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Sync_FirstPush_WhenRemoteBranchDoesNotExist()
+    {
+        var a = new PrimaryRepository(_pathA);
+        a.Init();
+        a.AddRemote("origin", _barePath);
+        File.WriteAllText(Path.Combine(_pathA, "first.txt"), "1");
+
+        var result = a.Sync(Alice, "first");
+
+        Assert.NotNull(result.Committed);
+        Assert.Null(result.Pulled);
+        Assert.True(result.Pushed);
+        Assert.True(result.Tracking.IsTracking);
+        Assert.True(result.Tracking.IsUpToDate);
+    }
+
+    [Fact]
+    public void Sync_IsNoOp_WhenCleanAndUpToDate()
+    {
+        var a = SeedRemoteViaA();
+
+        var result = a.Sync(Alice);
+
+        Assert.Null(result.Committed);
+        Assert.Equal(GitMergeStatus.UpToDate, result.Pulled!.Status);
+        Assert.False(result.Pushed);
+    }
+
+    [Fact]
+    public void Sync_Throws_WhenDirtyAndNoMessage()
+    {
+        var a = SeedRemoteViaA();
+        File.WriteAllText(Path.Combine(_pathA, "dirty.txt"), "d");
+
+        var ex = Assert.Throws<InvalidOperationException>(() => a.Sync(Alice));
+
+        Assert.Contains("uncommitted", ex.Message);
+        Assert.False(a.GetStatus().IsClean, "nothing should have been staged or committed");
+    }
+
+    [Fact]
+    public void Sync_PullsRemoteWork_AndPushesLocalWork()
+    {
+        var a = SeedRemoteViaA();
+        var b = CloneB();
+
+        WriteAndCommit(a, _pathA, "a-only.txt", "a", "a commit", Alice);
+        a.Push();
+        File.WriteAllText(Path.Combine(_pathB, "b-only.txt"), "b");
+
+        var result = b.Sync(Bob, "b commit");
+
+        Assert.Equal("b commit", result.Committed!.Message);
+        Assert.Equal(GitMergeStatus.Merged, result.Pulled!.Status);
+        Assert.True(result.Pushed);
+        Assert.True(result.Tracking.IsUpToDate);
+        Assert.True(File.Exists(Path.Combine(_pathB, "a-only.txt")));
+
+        Assert.Equal(GitMergeStatus.FastForward, a.Pull(Alice).Status);
+        Assert.True(File.Exists(Path.Combine(_pathA, "b-only.txt")));
+    }
+
+    [Fact]
+    public void Sync_StopsBeforePush_OnConflicts()
+    {
+        var a = SeedRemoteViaA();
+        var b = CloneB();
+
+        WriteAndCommit(a, _pathA, "shared.txt", "from A", "a edit", Alice);
+        a.Push();
+        File.WriteAllText(Path.Combine(_pathB, "shared.txt"), "from B");
+
+        var result = b.Sync(Bob, "b edit");
+
+        Assert.True(result.HasConflicts);
+        Assert.False(result.Pushed);
+        Assert.Contains("shared.txt", result.Pulled!.ConflictedFiles!);
+        Assert.True(b.GetStatus().HasConflicts);
+        Assert.Equal(1, result.Tracking.Ahead);
+        Assert.Equal(1, result.Tracking.Behind);
+    }
+
     // ── round trip ──────────────────────────────────────────────────────────
 
     [Fact]
