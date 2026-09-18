@@ -69,7 +69,7 @@ The directory structure for a Public Text repository (v1 focus in **bold**, late
 - **tags**: Tag indexes for the entire repository
 - **indexes**: Indexes for the entire repository
 - **settings**: Settings files
-- *metaweb*: Bookmarks, annotations and notes about web pages (later phase)
+- *bookmarks*: Bookmarks, annotations and notes about web pages (later phase)
   - *sites*: (eg `www.example.com.md`) folder containing all web pages with data for that site
     - *[modified url].md*: (eg `www.example.com-folder-page.md`)
   - *bookmarks*
