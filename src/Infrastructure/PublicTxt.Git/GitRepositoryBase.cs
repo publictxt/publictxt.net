@@ -50,7 +50,8 @@ public abstract class GitRepositoryBase : IGitRepository
             IsClean: !status.IsDirty,
             StagedCount: status.Staged.Count(),
             UnstagedCount: status.Modified.Count() + status.Missing.Count(),
-            UntrackedCount: status.Untracked.Count());
+            UntrackedCount: status.Untracked.Count(),
+            ConflictedCount: status.Count(e => e.State.HasFlag(FileStatus.Conflicted)));
     }
 
     public TrackingStatus GetTrackingStatus()
