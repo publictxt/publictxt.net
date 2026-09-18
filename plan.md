@@ -7,14 +7,14 @@
 Verified on this machine (`dotnet 10.0.400`, Windows): the solution builds and all 25 tests pass.
 
 | Area | State |
-|---|---|
+| --- | --- |
 | `PublicTxt.Core` | Two model classes only: `TxtInstance`, `TxtInstanceSettings` (with path validation). No parsing, no content services, no tests. |
 | `PublicTxt.Git` | `IGitRepository` / `IPrimaryRepository` / `IExternalRepository` implemented over LibGit2Sharp 0.32. Init, clone, stage, commit, fetch, pull (merge), push, checkout, read-only file access with path-traversal guard. |
 | `tests/GitTests` | 25 xunit v3 tests. Cover local-only paths; no test exercises clone/fetch/push/pull against a real remote. |
 | `PublicTxt.CLI` | `Console.WriteLine("Hello, World!")`. No project references. |
 | Feature projects (Wiki, Blog, Community, Bookmarks) | Do not exist yet. |
 | `PublicTxt.Data`, Blazor, Avalonia | Do not exist yet. |
-| CI | Dependabot for devcontainers only. No build/test workflow. |
+| CI | GitHub Actions build + test on ubuntu and windows (added 2026-09-18, not yet seen running). Dependabot for nuget, actions, devcontainers. |
 
 Milestone status: **M1 partially done** (git primitives exist, not wired to `TxtInstance`). M2–M6 not started.
 
@@ -22,15 +22,24 @@ Milestone status: **M1 partially done** (git primitives exist, not wired to `Txt
 
 ## 1. Housekeeping (small, do first)
 
-- [ ] **Finish the MetaWeb → Bookmarks rename in docs.** Still stale: [README.md:22](README.md#L22), [ProjectSpec.md:136](docs/ProjectSpec.md#L136), [ProjectSpec.md:166](docs/ProjectSpec.md#L166). (The "MetaWeb Commons" references in the big-pic docs are the future browser-extension concept and can stay.)
-- [ ] **Make README honest about placeholders.** It lists Features, Data, Blazor, Avalonia, Tools as if they exist. Mark them "(planned)" or link to this plan.
-- [ ] **Fill in `docs/CLAUDE.md`** build/test/run commands (currently "TBD"). Note that it lives under `docs/` so it is not auto-loaded; either move it to the repo root or add a root `CLAUDE.md` that points at it. Also note that the distrobox prefix only applies on Linux; on Windows plain `dotnet` works.
-- [ ] **Add a GitHub Actions workflow** that runs `dotnet build` + `dotnet test` on push/PR (ubuntu + windows matrix, since LibGit2Sharp has native bits).
-- [ ] **Extend Dependabot** to the `nuget` ecosystem.
-- [ ] **Fix `.distrobox/setup.sh`**: it installs `dotnet-sdk-9.0` but every project targets `net10.0`.
-- [ ] **Decide on tracked IDE files.** `.idea/**` and `PublicTxt.Net.sln.DotSettings.user` are committed. Either keep deliberately or `git rm --cached` and add to `.gitignore`.
-- [ ] **Prune merged/stale remote branches**: `feature/git-infra-basic`, `feature/change-metaweb-references-to-bookmarks`, `codex/align-target-framework-...`, `copilot/add-simple-git-interfaces`.
-- [ ] Optional: `Directory.Build.props` to centralise `net10.0` / `Nullable` / `ImplicitUsings`, and `Directory.Packages.props` for central package versions. Add solution folders (Core / Infrastructure / Apps / Tests) to the `.sln`.
+Done 2026-09-18 on branches `chore/docs-housekeeping`, `chore/ci`, `chore/dev-env`, `chore/build-props`.
+
+- [x] **Finish the MetaWeb → Bookmarks rename in docs.** (The "MetaWeb Commons" references in the big-pic docs are the future browser-extension concept and stay.)
+- [x] **Make README honest about placeholders.** README now has a status table.
+- [x] **`CLAUDE.md`** moved to the repo root with real build/test/run commands; distrobox prefix documented as Linux-only.
+- [x] **GitHub Actions workflow** `.github/workflows/build.yml`: build + test on ubuntu and windows. Not yet observed running — verify after the first push.
+- [x] **Dependabot** now covers `nuget`, `github-actions` and `devcontainers`.
+- [x] **`.distrobox/setup.sh`** installs the .NET 10 SDK.
+- [x] **IDE files untracked.** `.idea/` and `*.DotSettings.user` are git-ignored; files remain on disk. Reverse with `git add -f` if shared settings are wanted.
+- [ ] **Prune merged/stale remote branches** (left for a human; deletes on the remote):
+
+  ```bash
+  git push origin --delete feature/git-infra-basic feature/change-metaweb-references-to-bookmarks \
+    codex/align-target-framework-and-references-for-publictxt copilot/add-simple-git-interfaces
+  git branch -d feature/change-metaweb-references-to-bookmarks chore/docs-housekeeping chore/ci chore/dev-env chore/build-props
+  ```
+
+- [x] `Directory.Build.props` (net10.0 / Nullable / ImplicitUsings), `Directory.Packages.props` (central package versions), and Core / Infrastructure / Apps / Tests solution folders.
 
 ---
 
@@ -39,11 +48,13 @@ Milestone status: **M1 partially done** (git primitives exist, not wired to `Txt
 Goal from spec: origin sync with a single remote, **wired into the `TxtInstance` lifecycle**.
 
 ### 2.1 Wire Git into `TxtInstance`
+
 - [ ] Add a service in `PublicTxt.Git` (e.g. `TxtInstanceSyncService`) that takes a `TxtInstance` and drives `IPrimaryRepository` for it: open/clone from `RemoteUrl` into `LocalPath`, and update `InstanceStatus`, `GitStatus`, `CurrentBranch`, `LastGitSync`.
 - [ ] Map repository state to the `GitStatus` enum (`Synced` / `LocalChanges` / `RemoteChanges` / `Diverged`). This needs **ahead/behind counts** against the tracking branch, which `WorkingTreeStatus` does not expose yet — extend it or add a `TrackingStatus` record.
 - [ ] Decide whether `TxtInstance` gains an `Initialize()`/`Open()` step that validates `Settings` and the directory layout.
 
 ### 2.2 Gaps in `PrimaryRepository`
+
 - [ ] **Credentials.** `Fetch`, `Pull`, `Push` pass `null` options, so only unauthenticated/local remotes work. Introduce `IGitCredentials` (spec §4.4) and plumb a `CredentialsHandler` (SSH key, PAT/HTTPS basic) through fetch/pull/push/clone.
 - [ ] **Remote management**: add / list / remove remotes; set upstream tracking after `Push` on a new branch.
 - [ ] **Branch creation** (`CreateBranch(name, fromCommit?)`). The `Checkout` test currently drops to raw LibGit2Sharp to create a branch — a sign the API is missing.
@@ -52,11 +63,13 @@ Goal from spec: origin sync with a single remote, **wired into the `TxtInstance`
 - [ ] Pull is merge-only. Rebase can wait, but record the decision.
 
 ### 2.3 Gaps in `ExternalRepository`
+
 - [ ] **Glob bug**: `ListFiles("**/*.md")` compiles to `^.*/[^/\\]*\.md$`, which requires a slash and therefore misses root-level `.md` files. Replace the hand-rolled converter with `Microsoft.Extensions.FileSystemGlobbing`.
 - [ ] `FastForward` hardcodes a `system@localhost` signature. Fine for FF-only, but pass a `GitIdentity` for consistency or document why not.
 - [ ] `ReadFile` reads the working tree; add `ReadFile(path, branchOrRef)` that reads from a tree without checking out, so topic-branch content can be read without switching branches.
 
 ### 2.4 Tests
+
 - [ ] Add remote-based tests using a **local bare repository** as `origin`: clone, fetch, push, pull fast-forward, pull with a real merge, pull with conflicts (assert `ConflictedFiles`).
 - [ ] `ExternalRepository`: `CloneOrUpdate` second call actually fast-forwards new commits; `GetRemoteBranches` lists topic branches.
 - [ ] Regression test for the root-level glob bug above.
@@ -68,6 +81,7 @@ Goal from spec: origin sync with a single remote, **wired into the `TxtInstance`
 Goal from spec: parse and enumerate Markdown content per `TxtInstanceSettings` paths; CLI commands to inspect an instance.
 
 ### 3.1 `PublicTxt.Core`
+
 - [ ] **Content model**: a `ContentItem` (or per-type records) with relative path, content type, title, front matter, tags, outgoing links, modified time.
 - [ ] **Markdown parsing** with [Markdig](https://github.com/xoofx/markdig) (YAML front matter extension, link extraction). Default dialect is md-wiki (`[text](page.md)`); Obsidian `[[wiki-links]]` are out of scope on disk per spec §3.3.
 - [ ] **Instance enumeration**: walk each configured content path and yield items; blog items follow `blog/yyyy/MM/dd/*.md` and should get a parsed date.
@@ -78,6 +92,7 @@ Goal from spec: parse and enumerate Markdown content per `TxtInstanceSettings` p
 - [ ] New test project `tests/Core/CoreTests` with fixture instances under `tests/fixtures/`.
 
 ### 3.2 `PublicTxt.CLI`
+
 - [ ] Add project references to `PublicTxt.Core` and `PublicTxt.Git`; pick a command framework (`System.CommandLine` or `Spectre.Console.Cli`).
 - [ ] Commands for M1/M2:
   - `init [path]` — create instance skeleton + git init
@@ -88,7 +103,7 @@ Goal from spec: parse and enumerate Markdown content per `TxtInstanceSettings` p
   - `commit -m` / `sync` — stage all, commit, fetch/pull/push
   - `publish` — push to a Pages-enabled branch (the "zero-cost hosting" story from the big-pic doc; start with plain push, static-site generation later)
 - [ ] Credential input for the CLI (env var / `--token` / SSH agent) — ties to §2.2.
-- [ ] Document the commands in `docs/CLAUDE.md` and README.
+- [ ] Document the commands in `CLAUDE.md` and README.
 
 ---
 
@@ -139,7 +154,7 @@ Create the four projects under `src/Features/` (each references Core only, per l
 ## 8. Open decisions to close (from spec §8, with suggested defaults)
 
 | Question | Suggested default to unblock work |
-|---|---|
+| --- | --- |
 | Topic-branch naming | `topic/<name>`; subscribers filter on the prefix. Document in spec. |
 | WikiTool integration | Reference it as a NuGet/project dependency only at the app/CLI edge for import/export; Core stays md-wiki only. |
 | Notes content type owner | Core, alongside Media/Tags/Indexes. |
