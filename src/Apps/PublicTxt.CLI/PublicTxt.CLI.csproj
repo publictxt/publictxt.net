@@ -1,7 +1,22 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
+        <AssemblyName>publictxt</AssemblyName>
+        <RootNamespace>PublicTxt.CLI</RootNamespace>
     </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="System.CommandLine" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Core\PublicTxt.Core\PublicTxt.Core.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\PublicTxt.Git\PublicTxt.Git.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="CliTests" />
+    </ItemGroup>
 
 </Project>

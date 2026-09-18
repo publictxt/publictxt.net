@@ -263,6 +263,30 @@ public class PrimaryRepositoryTests : IDisposable
         Assert.Contains("Remote 'missing' not found", ex.Message);
     }
 
+    // ── identity ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void GetConfiguredIdentity_IsNull_BeforeInit()
+    {
+        var repo = new PrimaryRepository(_repoPath);
+        Assert.Null(repo.GetConfiguredIdentity());
+    }
+
+    [Fact]
+    public void GetConfiguredIdentity_ReadsLocalConfig()
+    {
+        var repo = InitWithCommit();
+        using (var raw = new LibGit2Sharp.Repository(_repoPath))
+        {
+            raw.Config.Set("user.name", "Local Name", LibGit2Sharp.ConfigurationLevel.Local);
+            raw.Config.Set("user.email", "local@example.com", LibGit2Sharp.ConfigurationLevel.Local);
+        }
+
+        var identity = repo.GetConfiguredIdentity();
+
+        Assert.Equal(new GitIdentity("Local Name", "local@example.com"), identity);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private PrimaryRepository InitWithCommit()

@@ -145,6 +145,24 @@ public sealed class PrimaryRepository(string localPath, IGitCredentials? credent
         }
     }
 
+    public void PushTo(string remote, string remoteBranch, string? localBranch = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remote);
+        ArgumentException.ThrowIfNullOrWhiteSpace(remoteBranch);
+        EnsureInitialized();
+
+        using var repo = Open();
+        var pushRemote = RequireRemote(repo, remote);
+        var branch = localBranch is null
+            ? repo.Head
+            : repo.Branches[localBranch] ?? throw new InvalidOperationException($"Branch '{localBranch}' not found.");
+
+        if (branch.Tip is null)
+            throw new InvalidOperationException("Nothing to push: the branch has no commits.");
+
+        repo.Network.Push(pushRemote, $"{branch.CanonicalName}:refs/heads/{remoteBranch}", BuildPushOptions());
+    }
+
     public void Checkout(string branchName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(branchName);

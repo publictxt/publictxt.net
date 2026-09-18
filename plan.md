@@ -8,15 +8,15 @@ Verified on this machine (`dotnet 10.0.400`, Windows): the solution builds and a
 
 | Area | State |
 | --- | --- |
-| `PublicTxt.Core` | Two model classes only: `TxtInstance`, `TxtInstanceSettings` (with path validation). No parsing, no content services, no tests. |
+| `PublicTxt.Core` | Models plus `Content` (Markdig/YamlDotNet parser: title, front matter, tags, links, blog dates) and `Instances` (layout conventions, JSON settings store, content reader, catalog with link resolution and backlinks). 92 tests over a committed fixture instance. |
 | `PublicTxt.Git` | `IGitRepository` / `IPrimaryRepository` / `IExternalRepository` over LibGit2Sharp 0.32: init, clone, stage, commit, fetch, pull, push with upstream tracking, branches, remotes, ahead/behind tracking status, credentials (HTTPS token), a `Sync` cycle, read-only access to any ref without checkout. `TxtInstanceGitService` drives all of it from a `TxtInstance`. |
 | `tests/GitTests` | 100 xunit v3 tests, including push/fetch/pull/merge/conflict scenarios against a local bare repository. |
-| `PublicTxt.CLI` | `Console.WriteLine("Hello, World!")`. No project references. |
+| `PublicTxt.CLI` | `publictxt` on System.CommandLine: init, clone, status, list, show, links, commit, sync, publish. 30 in-process tests. |
 | Feature projects (Wiki, Blog, Community, Bookmarks) | Do not exist yet. |
 | `PublicTxt.Data`, Blazor, Avalonia | Do not exist yet. |
 | CI | GitHub Actions build + test on ubuntu and windows (added 2026-09-18, not yet seen running). Dependabot for nuget, actions, devcontainers. |
 
-Milestone status: **M1 done** (2026-09-18). M2–M6 not started.
+Milestone status: **M1 done** (2026-09-18), **M2 done** (2026-09-19). M3–M6 not started.
 
 ---
 
@@ -81,34 +81,35 @@ Goal from spec: origin sync with a single remote, **wired into the `TxtInstance`
 
 ---
 
-## 3. M2 — Core content read + CLI
+## 3. M2 — Core content read + CLI (done 2026-09-19)
 
-Goal from spec: parse and enumerate Markdown content per `TxtInstanceSettings` paths; CLI commands to inspect an instance.
+Goal from spec: parse and enumerate Markdown content per `TxtInstanceSettings` paths; CLI commands to inspect an instance. Landed on branches `feature/core-content-model`, `feature/core-instance-layout`, `feature/cli`.
 
 ### 3.1 `PublicTxt.Core`
 
-- [ ] **Content model**: a `ContentItem` (or per-type records) with relative path, content type, title, front matter, tags, outgoing links, modified time.
-- [ ] **Markdown parsing** with [Markdig](https://github.com/xoofx/markdig) (YAML front matter extension, link extraction). Default dialect is md-wiki (`[text](page.md)`); Obsidian `[[wiki-links]]` are out of scope on disk per spec §3.3.
-- [ ] **Instance enumeration**: walk each configured content path and yield items; blog items follow `blog/yyyy/MM/dd/*.md` and should get a parsed date.
-- [ ] **Link resolution**: resolve relative md links to other items; report broken links.
-- [ ] **Tags**: extract from front matter and/or inline `#tag` convention (pick one, document it in the spec).
-- [ ] **Instance detection/validation**: "does this directory look like a PublicTxt instance?" plus creation of the default folder skeleton for `init`.
-- [ ] **Settings persistence**: read/write `TxtInstanceSettings` from the instance's `settings/` folder (JSON or YAML — decide).
-- [ ] New test project `tests/Core/CoreTests` with fixture instances under `tests/fixtures/`.
+- [x] **Content model**: `ContentItem` (path, type, title, front matter, tags, links, body, date, modified), `ContentLink` (internal / external / anchor, fragment, image), `FrontMatter` with typed accessors.
+- [x] **Markdown parsing** via Markdig + YamlDotNet in `MarkdownContentParser`. Title: front matter → first H1 → file name. Malformed front matter is treated as absent.
+- [x] **Instance enumeration**: `InstanceContentReader` walks each content directory, skips dot-entries, guards against root escapes. `BlogPathConvention` parses/builds `blog/yyyy/MM/dd/*.md` and `yyyyMMdd.md`.
+- [x] **Link resolution**: `ContentCatalog` resolves relative, root-relative, percent-encoded and extensionless links, reports broken ones, answers backlinks.
+- [x] **Tags decision**: both conventions, merged case-insensitively. Front matter `tags` (list or comma/space string) **and** Obsidian-style inline `#tag` in literal text (not headings, code, URLs; must contain a letter).
+- [x] **Instance detection/validation**: `InstanceLayout.IsInstance` / `Validate` / `CreateSkeleton` (`.gitkeep` per content dir, never overwrites).
+- [x] **Settings persistence decision**: JSON at `settings/instance.json` (camelCase, comments tolerated, unknown keys ignored) via `TxtInstanceSettingsStore`.
+- [x] `tests/Core/CoreTests` with the committed fixture `tests/fixtures/sample-instance`.
 
 ### 3.2 `PublicTxt.CLI`
 
-- [ ] Add project references to `PublicTxt.Core` and `PublicTxt.Git`; pick a command framework (`System.CommandLine` or `Spectre.Console.Cli`).
-- [ ] Commands for M1/M2:
-  - `init [path]` — create instance skeleton + git init
-  - `clone <url> [path]` — clone an existing instance
-  - `status` — instance + git status (ahead/behind, dirty)
-  - `list [--type blog|wiki|notes]` — enumerate content
-  - `show <path>` — dump parsed item (front matter, tags, links)
-  - `commit -m` / `sync` — stage all, commit, fetch/pull/push
-  - `publish` — push to a Pages-enabled branch (the "zero-cost hosting" story from the big-pic doc; start with plain push, static-site generation later)
-- [ ] Credential input for the CLI (env var / `--token` / SSH agent) — ties to §2.2.
-- [ ] Document the commands in `CLAUDE.md` and README.
+- [x] References Core + Git; **System.CommandLine 2.0** chosen (no colour/table dependency, easy in-process testing).
+- [x] Commands: `init`, `clone`, `status [--fetch]`, `list [--type] [--tag]`, `show <file> [--body]`, `links [--all]`, `commit -m`, `sync [-m]`, `publish [--branch]`. Exit codes 0 / 1 / 2 (conflicts); `links` exits 1 when broken links exist.
+- [x] Credentials: `--token` or `PUBLICTXT_GIT_TOKEN`. Author: `--author`, `PUBLICTXT_AUTHOR_NAME/EMAIL`, then git config. No SSH (see §2.2).
+- [x] Documented in `CLAUDE.md` (full list) and README (quick start).
+- [x] `tests/Apps/CliTests`: in-process tests over the fixture and a bare remote.
+
+### 3.3 Follow-ups surfaced while doing M2 (not blocking M3)
+
+- [ ] `publish` pushes the source branch as-is; static-site generation (index pages, HTML) is a later concern. GitHub Pages can serve raw Markdown via Jekyll, which is enough for now.
+- [ ] `status`/`list`/`show` rebuild the whole catalog on every call; fine for small instances, M5 persistence addresses it.
+- [ ] No `new` command yet (e.g. `publictxt new post` honouring the blog date layout); belongs with the Blog feature service in M4.
+- [ ] `list` has no `--json` output; add when a client or script needs it.
 
 ---
 

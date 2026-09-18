@@ -22,7 +22,25 @@ dotnet test tests/Infrastructure/GitTests/GitTests.csproj   # just the git tests
 dotnet run --project src/Apps/PublicTxt.CLI                 # CLI (currently a stub)
 ```
 
-Tests use xunit v3 and create throwaway git repositories under the system temp directory. Use `GitTestHelpers.DeleteDirectory` for cleanup; plain `Directory.Delete` fails on Windows because git object files are read-only.
+Tests use xunit v3 and create throwaway git repositories under the system temp directory. Use `GitTestHelpers.DeleteDirectory` for cleanup; plain `Directory.Delete` fails on Windows because git object files are read-only. Core and CLI tests read the committed fixture at `tests/fixtures/sample-instance`; keep it small and never make it a git repository.
+
+## CLI
+
+The CLI assembly is `publictxt`. Run it from source with `dotnet run --project src/Apps/PublicTxt.CLI -- <command>`.
+
+```text
+publictxt init [path] [--remote <url>] [--no-commit]   create skeleton + git repo (+ initial commit)
+publictxt clone <url> [path]                           clone an existing instance
+publictxt status [--fetch]                             git + content summary
+publictxt list [--type wiki|blog|notes|…] [--tag x]    table of items
+publictxt show <file> [--body]                         one item: metadata, links, backlinks
+publictxt links [--all]                                broken links (exit 1 if any) or every link
+publictxt commit -m "…"                                stage all + commit
+publictxt sync [-m "…"]                                commit (if -m), pull, push; exit 2 on conflicts
+publictxt publish [--branch gh-pages]                  push current branch to a Pages branch
+```
+
+All commands accept `--path`/`-C <dir>` (default: current directory). Author comes from `--author "Name <email>"`, then `PUBLICTXT_AUTHOR_NAME`/`PUBLICTXT_AUTHOR_EMAIL`, then git config. HTTPS token from `--token` or `PUBLICTXT_GIT_TOKEN`. SSH remotes are not supported (LibGit2Sharp lacks libssh2).
 
 ## Conventions
 

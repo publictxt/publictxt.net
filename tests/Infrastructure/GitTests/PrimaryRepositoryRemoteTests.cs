@@ -303,6 +303,48 @@ public class PrimaryRepositoryRemoteTests : IDisposable
         Assert.Equal(1, result.Tracking.Behind);
     }
 
+    // ── publish ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void PushTo_PublishesCurrentBranchUnderAnotherName_WithoutChangingTracking()
+    {
+        var a = SeedRemoteViaA();
+        var trackingBefore = a.GetTrackingStatus();
+
+        a.PushTo("origin", "gh-pages");
+
+        Assert.Equal(trackingBefore, a.GetTrackingStatus());
+        var ext = new ExternalRepository(_pathB);
+        ext.CloneOrUpdate(_barePath);
+        Assert.Contains("origin/gh-pages", ext.GetRemoteBranches());
+        Assert.Equal("v1", ext.ReadFileAt("origin/gh-pages", "shared.txt"));
+    }
+
+    [Fact]
+    public void PushTo_UpdatesExistingRemoteBranch()
+    {
+        var a = SeedRemoteViaA();
+        a.PushTo("origin", "gh-pages");
+        var second = WriteAndCommit(a, _pathA, "more.txt", "2", "second", Alice);
+
+        a.PushTo("origin", "gh-pages");
+
+        var ext = new ExternalRepository(_pathB);
+        ext.CloneOrUpdate(_barePath);
+        Assert.Equal("2", ext.ReadFileAt("origin/gh-pages", "more.txt"));
+        Assert.Contains("more.txt", ext.ListFilesAt("origin/gh-pages"));
+        // The default branch was not pushed again, so the clone's HEAD still lacks the second commit.
+        Assert.NotEqual(second.Sha, ext.LatestCommit!.Sha);
+        Assert.DoesNotContain("more.txt", ext.ListFiles());
+    }
+
+    [Fact]
+    public void PushTo_Throws_ForMissingLocalBranch()
+    {
+        var a = SeedRemoteViaA();
+        Assert.Throws<InvalidOperationException>(() => a.PushTo("origin", "gh-pages", "nope"));
+    }
+
     // ── round trip ──────────────────────────────────────────────────────────
 
     [Fact]
