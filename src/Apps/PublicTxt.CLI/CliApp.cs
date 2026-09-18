@@ -58,6 +58,7 @@ public sealed partial class CliApp
         root.Subcommands.Add(BuildCommit());
         root.Subcommands.Add(BuildSync());
         root.Subcommands.Add(BuildPublish());
+        root.Subcommands.Add(BuildSubscriptions());
 
         var config = new InvocationConfiguration { Output = _out, Error = _err };
         return root.Parse(args).Invoke(config);

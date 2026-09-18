@@ -13,33 +13,51 @@ public sealed partial class CliApp
         var typeOption = new Option<ContentType?>("--type", "-t") { Description = "Only this content type (blog, wiki, notes, …)." };
         var tagOption = new Option<string?>("--tag") { Description = "Only items carrying this tag." };
 
-        var cmd = new Command("list", "List content items.");
+        var searchOption = new Option<string?>("--search", "-s") { Description = "Only items whose title, tags or body contain this text." };
+        var timelineOption = new Option<bool>("--timeline") { Description = "Order newest first by date instead of by path." };
+
+        var cmd = new Command("list", "List content items (add --all to include subscriptions).");
         cmd.Options.Add(_pathOption);
         cmd.Options.Add(typeOption);
         cmd.Options.Add(tagOption);
+        cmd.Options.Add(searchOption);
+        cmd.Options.Add(_allOption);
+        cmd.Options.Add(timelineOption);
+        cmd.Options.Add(_tokenOption);
         cmd.SetAction(Guard(parse =>
         {
-            var reader = OpenReader(ResolveRoot(parse));
+            var agg = BuildAggregate(parse, ResolveRoot(parse));
+            var all = parse.GetValue(_allOption);
             var type = parse.GetValue(typeOption);
             var tag = parse.GetValue(tagOption);
+            var search = parse.GetValue(searchOption);
 
-            IEnumerable<ContentItem> items = type is { } t ? reader.Enumerate(t) : reader.EnumerateAll();
-            if (!string.IsNullOrEmpty(tag))
-                items = items.Where(i => i.HasTag(tag));
+            IEnumerable<ContentItem> items = parse.GetValue(timelineOption) ? agg.Timeline() : agg.Items
+                .OrderBy(i => i.Source ?? "", StringComparer.OrdinalIgnoreCase)
+                .ThenBy(i => i.Type)
+                .ThenBy(i => i.RelativePath, StringComparer.Ordinal);
+            if (type is { } t) items = items.Where(i => i.Type == t);
+            if (!string.IsNullOrEmpty(tag)) items = items.Where(i => i.HasTag(tag));
+            if (!string.IsNullOrEmpty(search)) items = items.Intersect(agg.Search(search));
 
-            var rows = items
-                .OrderBy(i => i.Type).ThenBy(i => i.RelativePath, StringComparer.Ordinal)
-                .Select(i => new[]
-                {
+            var rows = items.Select(i =>
+            {
+                var cells = new List<string>();
+                if (all) cells.Add(i.Source ?? "(local)");
+                cells.AddRange([
                     i.Type.ToString().ToLowerInvariant(),
                     i.RelativePath,
                     i.Title,
                     i.Date?.ToString("yyyy-MM-dd") ?? "",
                     string.Join(", ", i.Tags)
-                })
-                .ToList();
+                ]);
+                return cells.ToArray();
+            }).ToList();
 
-            WriteTable(["type", "path", "title", "date", "tags"], rows);
+            string[] headers = all
+                ? ["source", "type", "path", "title", "date", "tags"]
+                : ["type", "path", "title", "date", "tags"];
+            WriteTable(headers, rows);
             return ExitOk;
         }));
         return cmd;
