@@ -34,6 +34,12 @@ public interface IGitRepository
     /// <summary>Lists local branch names.</summary>
     IReadOnlyList<string> GetLocalBranches();
 
+    /// <summary>
+    /// The <c>user.name</c> / <c>user.email</c> from repository, global or system git config,
+    /// or null when either is unset or the repository is not initialized.
+    /// </summary>
+    GitIdentity? GetConfiguredIdentity();
+
     /// <summary>Fetches from <paramref name="remote"/> without merging.</summary>
     /// <exception cref="InvalidOperationException">The repository is not initialized or the remote does not exist.</exception>
     void Fetch(string remote = "origin");

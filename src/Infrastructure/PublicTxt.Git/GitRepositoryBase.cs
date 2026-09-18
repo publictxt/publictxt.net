@@ -90,6 +90,17 @@ public abstract class GitRepositoryBase : IGitRepository
             .ToList();
     }
 
+    public GitIdentity? GetConfiguredIdentity()
+    {
+        if (!IsInitialized) return null;
+        using var repo = Open();
+        var name = repo.Config.GetValueOrDefault<string>("user.name");
+        var email = repo.Config.GetValueOrDefault<string>("user.email");
+        return string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(email)
+            ? null
+            : new GitIdentity(name, email);
+    }
+
     public void Fetch(string remote = "origin")
     {
         EnsureInitialized();

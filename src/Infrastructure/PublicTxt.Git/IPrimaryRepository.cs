@@ -45,6 +45,14 @@ public interface IPrimaryRepository : IGitRepository
     /// </exception>
     GitSyncResult Sync(GitIdentity identity, string? commitMessage = null, string remote = "origin");
 
+    /// <summary>
+    /// Pushes a local branch (current branch by default) to <paramref name="remoteBranch"/> on the remote,
+    /// creating or updating that branch there. Tracking configuration is left untouched. Used to publish
+    /// content to a Pages-style branch.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The remote or local branch does not exist, or the branch has no commits.</exception>
+    void PushTo(string remote, string remoteBranch, string? localBranch = null);
+
     /// <summary>Checks out an existing local branch.</summary>
     /// <exception cref="InvalidOperationException">The branch does not exist.</exception>
     void Checkout(string branchName);
