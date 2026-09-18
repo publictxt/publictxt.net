@@ -146,7 +146,21 @@ Each of `PublicTxt.Wiki`, `PublicTxt.Blog`, `PublicTxt.Community`, and `PublicTx
 
 ### 7.1 PublicTxt.CLI
 
-Command-line entry point for batch operations, scripting, and headless use (publish, sync, convert, etc.). Currently a stub; commands TBD.
+Command-line entry point for batch operations, scripting, and headless use. Assembly name `publictxt`, built on System.CommandLine.
+
+| Command | Purpose |
+| --- | --- |
+| `init [path] [--remote url]` | Create the instance skeleton, `settings/instance.json`, git repo and initial commit |
+| `clone <url> [path]` | Clone an existing instance |
+| `status [--fetch]` | Git state (branch, upstream, ahead/behind, working tree) and content counts |
+| `list [--type t] [--tag x]` | Table of content items |
+| `show <file> [--body]` | One item: metadata, front matter, resolved links, backlinks |
+| `links [--all]` | Broken internal links (exit 1 if any) or every internal link |
+| `commit -m` | Stage all and commit |
+| `sync [-m]` | Commit (if `-m`), fetch, merge, push; exit 2 on conflicts |
+| `publish [--branch gh-pages]` | Push the current branch to a Pages-style branch |
+
+All commands take `--path`/`-C`. Author: `--author "Name <email>"`, then `PUBLICTXT_AUTHOR_NAME`/`_EMAIL`, then git config. Credentials: `--token` or `PUBLICTXT_GIT_TOKEN` (HTTPS only). See [CLAUDE.md](../CLAUDE.md) for details.
 
 ### 7.2 PublicTxt.Blazor — Placeholder
 
@@ -160,7 +174,8 @@ Cross-platform desktop client. Out of scope for the initial milestone.
 
 - Topic-branch naming convention.
 - WikiTool integration shape — referenced library, CLI shell-out, or port the converter into Core?
-- Notes content type — owned by Core, or its own feature project?
+- Notes content type — owned by Core, or its own feature project? (Parsing already lives in Core; a Notes feature project is only needed if notes gain behaviour beyond plain pages.)
+- Resolved (M2): **tags** come from both front matter `tags` and inline `#tag`, merged case-insensitively. **Settings** are JSON at `settings/instance.json`.
 - Conflict-resolution UX for origin sync. (Infrastructure now reports conflicts via `GitSyncResult.HasConflicts` / `GitStatus.Conflicted` and never auto-resolves; the UX is a client concern.)
 - How subscription-pulled external content is represented locally (separate worktree? imported into a `subscriptions/` tree? merged?).
 - Credential storage strategy across CLI / desktop / web. (`IGitCredentials` is the seam; CLI will start with the `PUBLICTXT_GIT_TOKEN` environment resolver.)
@@ -169,7 +184,7 @@ Cross-platform desktop client. Out of scope for the initial milestone.
 ## 9. Milestones (rough)
 
 1. **M1 — Git foundation.** ✅ Done 2026-09-18. `PublicTxt.Git` with origin sync (single remote): clone, fetch, pull, push, commit, status, credentials, sync cycle. Wired into `TxtInstance` via `TxtInstanceGitService`.
-2. **M2 — Core content read.** Parse and enumerate Markdown content per `TxtInstanceSettings` paths. CLI commands to inspect an instance.
+2. **M2 — Core content read.** ✅ Done 2026-09-19. Markdig-based parsing, instance layout and JSON settings, content catalog with link resolution and backlinks. `publictxt` CLI with init/clone/status/list/show/links/commit/sync/publish.
 3. **M3 — External subscriptions.** Subscribe to a remote PublicTxt repo with simple filters.
 4. **M4 — Feature services.** Flesh out Wiki / Blog / Bookmarks / Community APIs.
 5. **M5 — Persistence.** Introduce `PublicTxt.Data` for local cache/search.
