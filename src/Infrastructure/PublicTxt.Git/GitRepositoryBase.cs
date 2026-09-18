@@ -38,8 +38,7 @@ public abstract class GitRepositoryBase : IGitRepository
 
     public WorkingTreeStatus GetStatus()
     {
-        if (!IsInitialized)
-            throw new InvalidOperationException($"Repository at '{LocalPath}' is not initialized.");
+        EnsureInitialized();
 
         using var repo = Open();
         var status = repo.RetrieveStatus();
@@ -50,9 +49,68 @@ public abstract class GitRepositoryBase : IGitRepository
             UntrackedCount: status.Untracked.Count());
     }
 
+    public TrackingStatus GetTrackingStatus()
+    {
+        EnsureInitialized();
+
+        using var repo = Open();
+        var head = repo.Head;
+        var upstream = head.TrackedBranch;
+        if (upstream is null)
+            return TrackingStatus.None;
+
+        var details = head.TrackingDetails;
+        return new TrackingStatus(
+            UpstreamBranch: upstream.FriendlyName,
+            Ahead: details.AheadBy ?? 0,
+            Behind: details.BehindBy ?? 0);
+    }
+
+    public IReadOnlyList<GitRemoteInfo> GetRemotes()
+    {
+        if (!IsInitialized) return Array.Empty<GitRemoteInfo>();
+        using var repo = Open();
+        return repo.Network.Remotes
+            .Select(r => new GitRemoteInfo(r.Name, r.Url))
+            .ToList();
+    }
+
+    public IReadOnlyList<string> GetLocalBranches()
+    {
+        if (!IsInitialized) return Array.Empty<string>();
+        using var repo = Open();
+        return repo.Branches
+            .Where(b => !b.IsRemote)
+            .Select(b => b.FriendlyName)
+            .ToList();
+    }
+
+    public void Fetch(string remote = "origin")
+    {
+        EnsureInitialized();
+
+        using var repo = Open();
+        var fetchRemote = RequireRemote(repo, remote);
+        var refSpecs = fetchRemote.FetchRefSpecs.Select(r => r.Specification);
+        Commands.Fetch(repo, remote, refSpecs, BuildFetchOptions(), null);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     protected Repository Open() => new(LocalPath);
+
+    protected void EnsureInitialized()
+    {
+        if (!IsInitialized)
+            throw new InvalidOperationException($"Repository at '{LocalPath}' is not initialized.");
+    }
+
+    protected static Remote RequireRemote(Repository repo, string name) =>
+        repo.Network.Remotes[name]
+        ?? throw new InvalidOperationException($"Remote '{name}' not found.");
+
+    /// <summary>Hook for subclasses to supply credentials and other fetch options. Null means defaults.</summary>
+    protected virtual FetchOptions? BuildFetchOptions() => null;
 
     protected static GitCommitInfo MapCommit(Commit commit) =>
         new(
@@ -61,13 +119,15 @@ public abstract class GitRepositoryBase : IGitRepository
             Author: new GitIdentity(commit.Author.Name, commit.Author.Email),
             AuthoredAt: commit.Author.When);
 
-    protected static LibGit2Sharp.CloneOptions BuildCloneOptions(CloneOptions? options)
+    protected LibGit2Sharp.CloneOptions BuildCloneOptions(CloneOptions? options)
     {
         var lo = new LibGit2Sharp.CloneOptions();
         if (options?.BranchName is { } branch)
             lo.BranchName = branch;
         if (options is not null)
             lo.Checkout = options.Checkout;
+        if (BuildFetchOptions() is { } fetchOptions)
+            lo.FetchOptions.CredentialsProvider = fetchOptions.CredentialsProvider;
         return lo;
     }
 }

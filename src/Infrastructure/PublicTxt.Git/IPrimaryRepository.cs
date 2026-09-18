@@ -18,19 +18,35 @@ public interface IPrimaryRepository : IGitRepository
     void Stage(string path);
 
     /// <summary>Creates a commit with the supplied message using the provided author identity.</summary>
+    /// <exception cref="InvalidOperationException">Nothing is staged.</exception>
     GitCommitInfo Commit(string message, GitIdentity author);
 
-    /// <summary>Fetches from the tracked remote without merging.</summary>
-    void Fetch(string remote = "origin");
-
-    /// <summary>Pulls (fetch + merge/rebase) from the tracked remote branch.</summary>
+    /// <summary>Pulls (fetch + merge) from the tracked remote branch.</summary>
+    /// <exception cref="InvalidOperationException">The remote or the remote branch does not exist.</exception>
     GitMergeResult Pull(GitIdentity merger, string remote = "origin");
 
-    /// <summary>Pushes committed changes to the tracked remote branch.</summary>
+    /// <summary>
+    /// Pushes the current branch to <paramref name="remote"/>. If the branch does not yet track a
+    /// remote branch, upstream tracking is configured so later pulls and tracking status work.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The remote does not exist or the branch has no commits.</exception>
     void Push(string remote = "origin");
 
-    /// <summary>Checks out an existing branch.</summary>
+    /// <summary>Checks out an existing local branch.</summary>
+    /// <exception cref="InvalidOperationException">The branch does not exist.</exception>
     void Checkout(string branchName);
+
+    /// <summary>Creates a new local branch from the current HEAD and optionally checks it out.</summary>
+    /// <exception cref="InvalidOperationException">The branch already exists or the repository has no commits.</exception>
+    void CreateBranch(string branchName, bool checkout = false);
+
+    /// <summary>Adds a remote.</summary>
+    /// <exception cref="InvalidOperationException">A remote with that name already exists.</exception>
+    void AddRemote(string name, string url);
+
+    /// <summary>Removes a remote.</summary>
+    /// <exception cref="InvalidOperationException">The remote does not exist.</exception>
+    void RemoveRemote(string name);
 }
 
 public enum GitMergeStatus
@@ -42,7 +58,7 @@ public enum GitMergeStatus
 }
 
 public record GitMergeResult(
-    GitMergeStatus Status, 
-    string? CommitHash, 
+    GitMergeStatus Status,
+    string? CommitHash,
     IEnumerable<string>? ConflictedFiles = null
 );

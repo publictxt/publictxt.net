@@ -12,9 +12,6 @@ public interface IExternalRepository : IGitRepository
     /// Safe to call multiple times; if the repository already exists it is fetched and fast-forwarded instead.</summary>
     void CloneOrUpdate(string remoteUrl, CloneOptions? options = null);
 
-    /// <summary>Fetches latest changes from the remote without merging.</summary>
-    void Fetch(string remote = "origin");
-
     /// <summary>Lists available remote branches (useful for discovering topic branches).</summary>
     IEnumerable<string> GetRemoteBranches(string remote = "origin");
 

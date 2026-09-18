@@ -32,15 +32,6 @@ public sealed class ExternalRepository : GitRepositoryBase, IExternalRepository
         Repository.Clone(remoteUrl, LocalPath, BuildCloneOptions(options));
     }
 
-    public void Fetch(string remote = "origin")
-    {
-        using var repo = Open();
-        var fetchRemote = repo.Network.Remotes[remote]
-            ?? throw new InvalidOperationException($"Remote '{remote}' not found.");
-        var refSpecs = fetchRemote.FetchRefSpecs.Select(r => r.Specification);
-        Commands.Fetch(repo, remote, refSpecs, null, null);
-    }
-
     public IEnumerable<string> GetRemoteBranches(string remote = "origin")
     {
         if (!IsInitialized) return Enumerable.Empty<string>();
