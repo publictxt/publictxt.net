@@ -13,13 +13,13 @@ See [docs/ProjectSpec.md](docs/ProjectSpec.md) for the design and [plan.md](plan
 
 ## Status
 
-Early but usable from the command line: you can create an instance, write Markdown, sync it with a Git remote, inspect content, tags and links, and publish to a Pages branch. Subscriptions (the aggregation feature) are next.
+Usable from the command line: create an instance, write Markdown, sync it with a Git remote, inspect content, tags and links, publish to a Pages branch, and **subscribe to other PublicTxt repositories** to pull selected content into a local aggregate view.
 
 | Project | Path | Status |
 | --- | --- | --- |
-| PublicTxt.Core | `src/Core/PublicTxt.Core` | Models, Markdown parsing (Markdig), instance layout, settings, content catalog with link resolution |
-| PublicTxt.Git | `src/Infrastructure/PublicTxt.Git` | Implemented over LibGit2Sharp: sync cycle, credentials, tracking status, read-any-ref |
-| PublicTxt.CLI | `src/Apps/PublicTxt.CLI` | `publictxt` tool: init, clone, status, list, show, links, commit, sync, publish |
+| PublicTxt.Core | `src/Core/PublicTxt.Core` | Models, Markdown parsing (Markdig), instance layout, settings, content catalog with link resolution, subscriptions and aggregate view |
+| PublicTxt.Git | `src/Infrastructure/PublicTxt.Git` | Implemented over LibGit2Sharp: sync cycle, credentials, tracking status, read-any-ref, subscription caches |
+| PublicTxt.CLI | `src/Apps/PublicTxt.CLI` | `publictxt` tool: init, clone, status, list, show, links, commit, sync, publish, subscriptions |
 | PublicTxt.Wiki / Blog / Bookmarks / Community | `src/Features/*` | Planned |
 | PublicTxt.Data | `src/Infrastructure/PublicTxt.Data` | Planned |
 | PublicTxt.Avalonia / PublicTxt.Blazor | `src/Apps/*` | Planned |
@@ -48,6 +48,10 @@ publictxt list                       # what's in the instance
 publictxt show wiki/hello.md         # metadata, tags, links, backlinks
 publictxt links                      # broken internal links (exit 1 if any)
 publictxt publish                    # push to gh-pages for static hosting
+
+publictxt subscriptions add https://github.com/friend/notes.git --tag recipes --type wiki
+publictxt list --all                 # your pages plus the friend's recipe pages
+publictxt subscriptions update       # fetch the latest from every subscription
 ```
 
 See [CLAUDE.md](CLAUDE.md) for the full command list.

@@ -8,15 +8,15 @@ Verified on this machine (`dotnet 10.0.400`, Windows): the solution builds and a
 
 | Area | State |
 | --- | --- |
-| `PublicTxt.Core` | Models plus `Content` (Markdig/YamlDotNet parser: title, front matter, tags, links, blog dates) and `Instances` (layout conventions, JSON settings store, content reader, catalog with link resolution and backlinks). 92 tests over a committed fixture instance. |
-| `PublicTxt.Git` | `IGitRepository` / `IPrimaryRepository` / `IExternalRepository` over LibGit2Sharp 0.32: init, clone, stage, commit, fetch, pull, push with upstream tracking, branches, remotes, ahead/behind tracking status, credentials (HTTPS token), a `Sync` cycle, read-only access to any ref without checkout. `TxtInstanceGitService` drives all of it from a `TxtInstance`. |
-| `tests/GitTests` | 100 xunit v3 tests, including push/fetch/pull/merge/conflict scenarios against a local bare repository. |
-| `PublicTxt.CLI` | `publictxt` on System.CommandLine: init, clone, status, list, show, links, commit, sync, publish. 30 in-process tests. |
+| `PublicTxt.Core` | Models plus `Content` (Markdig/YamlDotNet parser: title, front matter, tags, links, blog dates), `Instances` (layout conventions, JSON settings store, content reader, catalog with link resolution and backlinks) and `Subscriptions` (model, filter, store, aggregate catalog). 128 tests over a committed fixture instance. |
+| `PublicTxt.Git` | `IGitRepository` / `IPrimaryRepository` / `IExternalRepository` over LibGit2Sharp 0.32: init, clone, stage, commit, fetch, pull, push with upstream tracking, branches, remotes, ahead/behind tracking status, credentials (HTTPS token), a `Sync` cycle, read-only access to any ref without checkout. `TxtInstanceGitService` drives all of it from a `TxtInstance`; `SubscriptionService` manages per-subscription caches. |
+| `tests/GitTests` | 122 xunit v3 tests, including push/fetch/pull/merge/conflict and subscription scenarios against local bare repositories. |
+| `PublicTxt.CLI` | `publictxt` on System.CommandLine: init, clone, status, list (with `--all`), show, links, commit, sync, publish, subscriptions. 39 in-process tests. |
 | Feature projects (Wiki, Blog, Community, Bookmarks) | Do not exist yet. |
 | `PublicTxt.Data`, Blazor, Avalonia | Do not exist yet. |
 | CI | GitHub Actions build + test on ubuntu and windows (added 2026-09-18, not yet seen running). Dependabot for nuget, actions, devcontainers. |
 
-Milestone status: **M1 done** (2026-09-18), **M2 done** (2026-09-19). M3–M6 not started.
+Milestone status: **M1 done** (2026-09-18), **M2 done** (2026-09-19), **M3 done** (2026-09-19). M4–M6 not started. The v1 success statement from the big-pic doc is achievable from the CLI today.
 
 ---
 
@@ -75,7 +75,7 @@ Goal from spec: origin sync with a single remote, **wired into the `TxtInstance`
 
 ### 2.5 Follow-ups surfaced while doing M1 (not blocking M2)
 
-- [ ] `ExternalRepository.CloneOrUpdate` fast-forwards only the checked-out branch; subscriptions that follow several topic branches will need per-branch refs (M3).
+- [x] `ExternalRepository.UpdateToBranch` (M3) follows any branch and resets the cache; `CloneOrUpdate` remains for the simple fast-forward case.
 - [ ] `Pull`/`Sync` merge with default options; consider `MergeOptions` for `.gitattributes`-driven strategies later.
 - [ ] Credentials are resolved per call; a caching/prompting resolver belongs with the CLI (M2) and desktop (M6).
 
@@ -113,17 +113,26 @@ Goal from spec: parse and enumerate Markdown content per `TxtInstanceSettings` p
 
 ---
 
-## 4. M3 — External subscriptions (the differentiator)
+## 4. M3 — External subscriptions (done 2026-09-19)
 
-Goal from spec: subscribe to a remote PublicTxt repo with simple filters.
+Goal from spec: subscribe to a remote PublicTxt repo with simple filters. Landed on branches `feature/subscriptions-core`, `feature/subscriptions-git`.
 
-- [ ] **Subscription model** in Core: name, remote URL, branch, filter rules, last-updated, local cache path.
-- [ ] **`ISubscriptionFilter`** (spec §4.4): path glob, content type, tag, branch; composable. Start with path + content type + branch; tag filtering depends on M2 parsing.
-- [ ] **Local representation** — open question §8 in the spec. Recommended starting point: each subscription is a separate `ExternalRepository` clone in a cache directory *outside* the instance's git tree (e.g. `<instance>/.publictxt/subscriptions/<name>` and git-ignored, or a per-user cache dir). The aggregate view is computed, not copied into the instance. Revisit "import into `subscriptions/` and commit" later if users want it.
-- [ ] **Aggregate view**: enumerate filtered items across the instance + all subscriptions, using the M2 content model.
-- [ ] **Subscription persistence** in `settings/subscriptions.*` so subscriptions travel with the instance.
-- [ ] CLI: `subscribe <url> [--branch] [--path] [--type]`, `unsubscribe`, `subscriptions list`, `subscriptions update [name]`, and `list --all` to include aggregated content.
-- [ ] Tests: two local source repos → one instance with two subscriptions and differing filters.
+- [x] **Subscription model** (`Core.Subscriptions.Subscription`): name, remote URL, optional branch, filter, added/updated timestamps, last commit SHA.
+- [x] **`SubscriptionFilter`**: content types, include/exclude path globs, include/exclude tags. Criteria ANDed, values ORed. `MatchesPath` pre-check avoids parsing files that cannot match.
+- [x] **Local representation decision**: separate read-only clone per subscription at `<instance>/.publictxt/subscriptions/<name>`, git-ignored (the service adds the ignore entry). Aggregate is computed, never committed. `ExternalRepository.UpdateToBranch` hard-resets the cache, so force pushes and branch switches are harmless.
+- [x] **Aggregate view** (`AggregateCatalog`): local + subscribed items with `Source`, per-source/type/tag queries, timeline, search; a failing subscription is reported, not fatal.
+- [x] **Persistence** at `settings/subscriptions.json` (camelCase, lowercase enums), meant to be committed.
+- [x] CLI: `subscriptions add|remove|list|update` (alias `subs`), `list --all [--search] [--timeline]`, subscription summary in `status`.
+- [x] Tests: two published instances with different filters and a topic branch, at service level and through the CLI.
+
+### 4.1 Follow-ups surfaced while doing M3 (not blocking M4)
+
+- [ ] `subscriptions update` is sequential; parallel fetches would help with many subscriptions.
+- [ ] Subscribed items are not link-resolved (no backlinks across sources). Cross-source link resolution needs a decision on how a link in Alice's page to another of Alice's pages should render locally.
+- [ ] Caches are per instance. A per-user shared cache would avoid re-cloning the same remote for several instances.
+- [ ] No `subscriptions edit`; changing a filter means remove + add (the cache is re-cloned). Could rewrite the JSON in place instead.
+- [ ] `show` does not accept `<source>:<path>`; subscribed items can only be listed, not shown.
+- [ ] The **v1 success statement** is now testable end to end from the CLI. Real-world use will surface the next priorities better than the plan can.
 
 ---
 
