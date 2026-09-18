@@ -9,14 +9,14 @@ Verified on this machine (`dotnet 10.0.400`, Windows): the solution builds and a
 | Area | State |
 | --- | --- |
 | `PublicTxt.Core` | Two model classes only: `TxtInstance`, `TxtInstanceSettings` (with path validation). No parsing, no content services, no tests. |
-| `PublicTxt.Git` | `IGitRepository` / `IPrimaryRepository` / `IExternalRepository` implemented over LibGit2Sharp 0.32. Init, clone, stage, commit, fetch, pull (merge), push, checkout, read-only file access with path-traversal guard. |
-| `tests/GitTests` | 25 xunit v3 tests. Cover local-only paths; no test exercises clone/fetch/push/pull against a real remote. |
+| `PublicTxt.Git` | `IGitRepository` / `IPrimaryRepository` / `IExternalRepository` over LibGit2Sharp 0.32: init, clone, stage, commit, fetch, pull, push with upstream tracking, branches, remotes, ahead/behind tracking status, credentials (HTTPS token), a `Sync` cycle, read-only access to any ref without checkout. `TxtInstanceGitService` drives all of it from a `TxtInstance`. |
+| `tests/GitTests` | 100 xunit v3 tests, including push/fetch/pull/merge/conflict scenarios against a local bare repository. |
 | `PublicTxt.CLI` | `Console.WriteLine("Hello, World!")`. No project references. |
 | Feature projects (Wiki, Blog, Community, Bookmarks) | Do not exist yet. |
 | `PublicTxt.Data`, Blazor, Avalonia | Do not exist yet. |
 | CI | GitHub Actions build + test on ubuntu and windows (added 2026-09-18, not yet seen running). Dependabot for nuget, actions, devcontainers. |
 
-Milestone status: **M1 partially done** (git primitives exist, not wired to `TxtInstance`). M2–M6 not started.
+Milestone status: **M1 done** (2026-09-18). M2–M6 not started.
 
 ---
 
@@ -43,36 +43,41 @@ Done 2026-09-18 on branches `chore/docs-housekeeping`, `chore/ci`, `chore/dev-en
 
 ---
 
-## 2. M1 — Git foundation (finish)
+## 2. M1 — Git foundation (done 2026-09-18)
 
-Goal from spec: origin sync with a single remote, **wired into the `TxtInstance` lifecycle**.
+Goal from spec: origin sync with a single remote, **wired into the `TxtInstance` lifecycle**. Landed on branches `feature/git-external-repo-reads`, `feature/git-primary-repo-api`, `feature/git-credentials`, `feature/instance-sync`.
 
 ### 2.1 Wire Git into `TxtInstance`
 
-- [ ] Add a service in `PublicTxt.Git` (e.g. `TxtInstanceSyncService`) that takes a `TxtInstance` and drives `IPrimaryRepository` for it: open/clone from `RemoteUrl` into `LocalPath`, and update `InstanceStatus`, `GitStatus`, `CurrentBranch`, `LastGitSync`.
-- [ ] Map repository state to the `GitStatus` enum (`Synced` / `LocalChanges` / `RemoteChanges` / `Diverged`). This needs **ahead/behind counts** against the tracking branch, which `WorkingTreeStatus` does not expose yet — extend it or add a `TrackingStatus` record.
-- [ ] Decide whether `TxtInstance` gains an `Initialize()`/`Open()` step that validates `Settings` and the directory layout.
+- [x] `TxtInstanceGitService` (in `PublicTxt.Git`): `Initialize` clones from `RemoteUrl` or inits locally and adds `origin`; `Refresh` maps repo state onto `TxtInstance`; `Sync` runs a cycle and records `LastGitSync`. Failures set `InstanceStatus.Error`.
+- [x] `TrackingStatus` (upstream, ahead, behind) on `IGitRepository`; `ComputeGitStatus` maps tree + tracking to the `GitStatus` enum, which gained `Conflicted`.
+- [x] **Decision:** `TxtInstance` stays a plain model. Lifecycle lives in services (`TxtInstanceGitService` now; a Core-side instance/layout validator in M2).
 
-### 2.2 Gaps in `PrimaryRepository`
+### 2.2 `PrimaryRepository`
 
-- [ ] **Credentials.** `Fetch`, `Pull`, `Push` pass `null` options, so only unauthenticated/local remotes work. Introduce `IGitCredentials` (spec §4.4) and plumb a `CredentialsHandler` (SSH key, PAT/HTTPS basic) through fetch/pull/push/clone.
-- [ ] **Remote management**: add / list / remove remotes; set upstream tracking after `Push` on a new branch.
-- [ ] **Branch creation** (`CreateBranch(name, fromCommit?)`). The `Checkout` test currently drops to raw LibGit2Sharp to create a branch — a sign the API is missing.
-- [ ] **Guard empty commits.** `Commit` with nothing staged throws LibGit2Sharp's `EmptyCommitException`; either surface a clear domain exception or return null.
-- [ ] Consider a `Sync()` convenience (fetch → pull → push) that returns a combined result, since that is what the CLI and apps will actually call.
-- [ ] Pull is merge-only. Rebase can wait, but record the decision.
+- [x] **Credentials.** `IGitCredentials` with `Static`, `Environment` (`PUBLICTXT_GIT_TOKEN`) and `Delegate` resolvers, threaded through fetch/pull/push/clone. HTTPS token only: the LibGit2Sharp native binaries lack libssh2, so **SSH is not supported through this backend**. Revisit with a git-CLI shell-out adapter if SSH becomes necessary.
+- [x] Remotes: `AddRemote` / `RemoveRemote` / `GetRemotes`; `Push` sets upstream tracking and refuses an unborn branch.
+- [x] `CreateBranch(name, checkout)` and `GetLocalBranches`.
+- [x] Empty commit → `InvalidOperationException("Nothing to commit…")`.
+- [x] `Sync(identity, commitMessage?, remote)` → `GitSyncResult`; stops before push on conflicts.
+- [x] **Decision:** pull is merge-only for now. Rebase is deferred until a client needs linear history.
 
-### 2.3 Gaps in `ExternalRepository`
+### 2.3 `ExternalRepository`
 
-- [ ] **Glob bug**: `ListFiles("**/*.md")` compiles to `^.*/[^/\\]*\.md$`, which requires a slash and therefore misses root-level `.md` files. Replace the hand-rolled converter with `Microsoft.Extensions.FileSystemGlobbing`.
-- [ ] `FastForward` hardcodes a `system@localhost` signature. Fine for FF-only, but pass a `GitIdentity` for consistency or document why not.
-- [ ] `ReadFile` reads the working tree; add `ReadFile(path, branchOrRef)` that reads from a tree without checking out, so topic-branch content can be read without switching branches.
+- [x] Glob via `Microsoft.Extensions.FileSystemGlobbing`; `**/*.md` now includes root-level files.
+- [x] `FastForward` signature documented as a placeholder (FF-only never creates a commit).
+- [x] `ReadFileAt(ref, path)` and `ListFilesAt(ref, glob)` read any branch/tag/SHA without checkout.
 
 ### 2.4 Tests
 
-- [ ] Add remote-based tests using a **local bare repository** as `origin`: clone, fetch, push, pull fast-forward, pull with a real merge, pull with conflicts (assert `ConflictedFiles`).
-- [ ] `ExternalRepository`: `CloneOrUpdate` second call actually fast-forwards new commits; `GetRemoteBranches` lists topic branches.
-- [ ] Regression test for the root-level glob bug above.
+- [x] Bare-repo remote tests: push/tracking, clone, fetch-only, ahead/behind/diverged, pull up-to-date / fast-forward / merge / conflicts, A-B-A round trip, topic-branch push then read via `ExternalRepository`.
+- [x] `CloneOrUpdate` fast-forwards; `GetRemoteBranches` lists topic branches; glob regression.
+
+### 2.5 Follow-ups surfaced while doing M1 (not blocking M2)
+
+- [ ] `ExternalRepository.CloneOrUpdate` fast-forwards only the checked-out branch; subscriptions that follow several topic branches will need per-branch refs (M3).
+- [ ] `Pull`/`Sync` merge with default options; consider `MergeOptions` for `.gitattributes`-driven strategies later.
+- [ ] Credentials are resolved per call; a caching/prompting resolver belongs with the CLI (M2) and desktop (M6).
 
 ---
 

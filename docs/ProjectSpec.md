@@ -118,14 +118,21 @@ The instance can also **subscribe to external PublicTxt repositories** and pull 
 
 `PublicTxt.Git` speaks only standard Git — clone, fetch, push, branches, refs, commits. No GitHub/GitLab/Gitea API calls. Any provider-specific features (PRs, issues, forks-as-API) belong in a future, optional adapter layer.
 
-### 4.4 Interfaces (sketch — TBD)
+### 4.4 Interfaces
 
-The following abstractions are anticipated; exact shapes will emerge as the implementation lands:
+Implemented (see `src/Infrastructure/PublicTxt.Git`):
 
-- `IPrimaryRepository` — operations on the instance's own working copy and its origin remote(s).
-- `IExternalRepository` — read-only operations against a subscribed external repo.
+- `IGitRepository` — shared inspection: branch, latest commit, working-tree status (incl. conflicts), tracking status (upstream / ahead / behind), remotes, local branches, fetch.
+- `IPrimaryRepository` — the instance's own working copy: init, clone, stage, commit, pull (merge), push (sets upstream), checkout, create branch, add/remove remote, and `Sync` (commit → fetch → merge → push, stopping before push on conflicts).
+- `IExternalRepository` — a subscribed repo: clone-or-update, remote branch discovery, fast-forward, and reading files or listing trees from the working tree **or from any ref without checkout** (`ReadFileAt`, `ListFilesAt`).
+- `IGitCredentials` — provider-agnostic credential resolution, threaded through every network call. Implementations: static token, environment variable (`PUBLICTXT_GIT_TOKEN`), delegate. **Only HTTPS username/token is supported**; the LibGit2Sharp native binaries are built without libssh2, so SSH would need a separate git-CLI adapter.
+- `TxtInstanceGitService` — bridges `TxtInstance` and `IPrimaryRepository`: initialise (clone or init), refresh status, sync.
+
+Anticipated (M3):
+
 - `ISubscriptionFilter` — encapsulates the rules for which content from an external repo gets pulled.
-- `IGitCredentials` — credential resolution (SSH key, PAT, etc.), provider-agnostic.
+
+Decisions recorded: pull/sync merge rather than rebase; `TxtInstance` stays a plain model and lifecycle lives in services.
 
 ## 5. Persistence (`PublicTxt.Data`) — Placeholder
 
@@ -154,13 +161,14 @@ Cross-platform desktop client. Out of scope for the initial milestone.
 - Topic-branch naming convention.
 - WikiTool integration shape — referenced library, CLI shell-out, or port the converter into Core?
 - Notes content type — owned by Core, or its own feature project?
-- Conflict-resolution UX for origin sync (multiple remotes diverging).
+- Conflict-resolution UX for origin sync. (Infrastructure now reports conflicts via `GitSyncResult.HasConflicts` / `GitStatus.Conflicted` and never auto-resolves; the UX is a client concern.)
 - How subscription-pulled external content is represented locally (separate worktree? imported into a `subscriptions/` tree? merged?).
-- Credential storage strategy across CLI / desktop / web.
+- Credential storage strategy across CLI / desktop / web. (`IGitCredentials` is the seam; CLI will start with the `PUBLICTXT_GIT_TOKEN` environment resolver.)
+- SSH support: not possible through LibGit2Sharp's bundled binaries. Options if needed: a git-CLI adapter, or HTTPS tokens only.
 
 ## 9. Milestones (rough)
 
-1. **M1 — Git foundation.** `PublicTxt.Git` with origin sync (single remote): clone, fetch, pull, push, commit, status. Wired into `TxtInstance` lifecycle.
+1. **M1 — Git foundation.** ✅ Done 2026-09-18. `PublicTxt.Git` with origin sync (single remote): clone, fetch, pull, push, commit, status, credentials, sync cycle. Wired into `TxtInstance` via `TxtInstanceGitService`.
 2. **M2 — Core content read.** Parse and enumerate Markdown content per `TxtInstanceSettings` paths. CLI commands to inspect an instance.
 3. **M3 — External subscriptions.** Subscribe to a remote PublicTxt repo with simple filters.
 4. **M4 — Feature services.** Flesh out Wiki / Blog / Bookmarks / Community APIs.
