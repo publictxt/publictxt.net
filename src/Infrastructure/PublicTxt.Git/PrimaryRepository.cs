@@ -6,7 +6,8 @@ namespace PublicTxt.Git;
 /// LibGit2Sharp-backed implementation of <see cref="IPrimaryRepository"/>.
 /// Manages the primary (owned) git repository for a PublicTxt instance.
 /// </summary>
-public sealed class PrimaryRepository(string localPath) : GitRepositoryBase(localPath), IPrimaryRepository
+public sealed class PrimaryRepository(string localPath, IGitCredentials? credentials = null)
+    : GitRepositoryBase(localPath, credentials), IPrimaryRepository
 {
     public void Init()
     {

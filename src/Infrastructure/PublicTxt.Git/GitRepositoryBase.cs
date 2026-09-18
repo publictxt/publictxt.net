@@ -6,10 +6,14 @@ public abstract class GitRepositoryBase : IGitRepository
 {
     public string LocalPath { get; }
 
-    protected GitRepositoryBase(string localPath)
+    /// <summary>Credential source used for fetch, pull, push and clone. Null means anonymous/default.</summary>
+    protected IGitCredentials? Credentials { get; }
+
+    protected GitRepositoryBase(string localPath, IGitCredentials? credentials = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
         LocalPath = localPath;
+        Credentials = credentials;
     }
 
     public bool IsInitialized =>
@@ -109,8 +113,12 @@ public abstract class GitRepositoryBase : IGitRepository
         repo.Network.Remotes[name]
         ?? throw new InvalidOperationException($"Remote '{name}' not found.");
 
-    /// <summary>Hook for subclasses to supply credentials and other fetch options. Null means defaults.</summary>
-    protected virtual FetchOptions? BuildFetchOptions() => null;
+    /// <summary>Fetch options carrying the configured credentials, or null when running anonymously.</summary>
+    protected FetchOptions? BuildFetchOptions()
+    {
+        var handler = GitCredentialAdapter.ToHandler(Credentials);
+        return handler is null ? null : new FetchOptions { CredentialsProvider = handler };
+    }
 
     protected static GitCommitInfo MapCommit(Commit commit) =>
         new(

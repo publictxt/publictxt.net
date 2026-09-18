@@ -12,4 +12,8 @@
         <ProjectReference Include="..\..\Core\PublicTxt.Core\PublicTxt.Core.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="GitTests" />
+    </ItemGroup>
+
 </Project>
