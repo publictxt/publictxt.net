@@ -8,7 +8,6 @@ namespace PublicTxt.Git;
 /// </summary>
 public sealed class PrimaryRepository(string localPath) : GitRepositoryBase(localPath), IPrimaryRepository
 {
-
     public void Init()
     {
         Directory.CreateDirectory(LocalPath);
@@ -39,27 +38,26 @@ public sealed class PrimaryRepository(string localPath) : GitRepositoryBase(loca
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         using var repo = Open();
         var sig = new Signature(author.Name, author.Email, DateTimeOffset.UtcNow);
-        var commit = repo.Commit(message, sig, sig);
-        return MapCommit(commit);
-    }
-
-    public void Fetch(string remote = "origin")
-    {
-        using var repo = Open();
-        var fetchRemote = repo.Network.Remotes[remote]
-            ?? throw new InvalidOperationException($"Remote '{remote}' not found.");
-        var refSpecs = fetchRemote.FetchRefSpecs.Select(r => r.Specification);
-        Commands.Fetch(repo, remote, refSpecs, null, null);
+        try
+        {
+            var commit = repo.Commit(message, sig, sig);
+            return MapCommit(commit);
+        }
+        catch (EmptyCommitException ex)
+        {
+            throw new InvalidOperationException("Nothing to commit: no changes are staged.", ex);
+        }
     }
 
     public GitMergeResult Pull(GitIdentity merger, string remote = "origin")
     {
+        EnsureInitialized();
+
         using var repo = Open();
-        var pullRemote = repo.Network.Remotes[remote]
-            ?? throw new InvalidOperationException($"Remote '{remote}' not found.");
+        var pullRemote = RequireRemote(repo, remote);
 
         var refSpecs = pullRemote.FetchRefSpecs.Select(r => r.Specification);
-        Commands.Fetch(repo, remote, refSpecs, null, null);
+        Commands.Fetch(repo, remote, refSpecs, BuildFetchOptions(), null);
 
         var head = repo.Head;
         var remoteBranch = repo.Branches[$"{remote}/{head.FriendlyName}"]
@@ -79,17 +77,35 @@ public sealed class PrimaryRepository(string localPath) : GitRepositoryBase(loca
 
         IEnumerable<string>? conflictedFiles = null;
         if (status == GitMergeStatus.Conflicts)
-            conflictedFiles = repo.Index.Conflicts.Select(c => c.Ours.Path).Distinct().ToList();
+        {
+            conflictedFiles = repo.Index.Conflicts
+                .Select(c => (c.Ours ?? c.Theirs ?? c.Ancestor)?.Path)
+                .Where(p => p is not null)
+                .Distinct()
+                .ToList()!;
+        }
 
         return new GitMergeResult(status, result.Commit?.Sha, conflictedFiles);
     }
 
     public void Push(string remote = "origin")
     {
+        EnsureInitialized();
+
         using var repo = Open();
-        var pushRemote = repo.Network.Remotes[remote]
-            ?? throw new InvalidOperationException($"Remote '{remote}' not found.");
-        repo.Network.Push(pushRemote, repo.Head.CanonicalName, (PushOptions?)null);
+        var pushRemote = RequireRemote(repo, remote);
+        var head = repo.Head;
+        if (head.Tip is null)
+            throw new InvalidOperationException("Nothing to push: the current branch has no commits.");
+
+        repo.Network.Push(pushRemote, head.CanonicalName, BuildPushOptions());
+
+        if (head.TrackedBranch is null || head.RemoteName != remote)
+        {
+            repo.Branches.Update(head,
+                b => b.Remote = remote,
+                b => b.UpstreamBranch = head.CanonicalName);
+        }
     }
 
     public void Checkout(string branchName)
@@ -99,5 +115,51 @@ public sealed class PrimaryRepository(string localPath) : GitRepositoryBase(loca
         var branch = repo.Branches[branchName]
             ?? throw new InvalidOperationException($"Branch '{branchName}' not found.");
         Commands.Checkout(repo, branch);
+    }
+
+    public void CreateBranch(string branchName, bool checkout = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(branchName);
+        using var repo = Open();
+
+        if (repo.Head.Tip is null)
+            throw new InvalidOperationException("Cannot create a branch: the repository has no commits.");
+        if (repo.Branches[branchName] is not null)
+            throw new InvalidOperationException($"Branch '{branchName}' already exists.");
+
+        var branch = repo.CreateBranch(branchName);
+        if (checkout)
+            Commands.Checkout(repo, branch);
+    }
+
+    public void AddRemote(string name, string url)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        using var repo = Open();
+
+        if (repo.Network.Remotes[name] is not null)
+            throw new InvalidOperationException($"Remote '{name}' already exists.");
+
+        repo.Network.Remotes.Add(name, url);
+    }
+
+    public void RemoveRemote(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        using var repo = Open();
+        RequireRemote(repo, name);
+        repo.Network.Remotes.Remove(name);
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>Hook for credentials and other push options. Null means defaults.</summary>
+    private PushOptions? BuildPushOptions()
+    {
+        var fetchOptions = BuildFetchOptions();
+        return fetchOptions?.CredentialsProvider is null
+            ? null
+            : new PushOptions { CredentialsProvider = fetchOptions.CredentialsProvider };
     }
 }

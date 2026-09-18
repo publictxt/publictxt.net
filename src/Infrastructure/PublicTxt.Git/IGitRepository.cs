@@ -1,7 +1,7 @@
 namespace PublicTxt.Git;
 
 /// <summary>
-/// Common read-only git repository operations shared by primary and external repos.
+/// Common git repository operations shared by primary and external repos: inspection plus fetch.
 /// </summary>
 public interface IGitRepository
 {
@@ -20,4 +20,21 @@ public interface IGitRepository
     /// <summary>Returns a summary of the working-directory and index status.</summary>
     /// <exception cref="InvalidOperationException">The repository is not initialized.</exception>
     WorkingTreeStatus GetStatus();
+
+    /// <summary>
+    /// Returns how the current branch relates to its upstream branch as of the last fetch.
+    /// Call <see cref="Fetch"/> first for an up-to-date answer.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The repository is not initialized.</exception>
+    TrackingStatus GetTrackingStatus();
+
+    /// <summary>Lists the configured remotes.</summary>
+    IReadOnlyList<GitRemoteInfo> GetRemotes();
+
+    /// <summary>Lists local branch names.</summary>
+    IReadOnlyList<string> GetLocalBranches();
+
+    /// <summary>Fetches from <paramref name="remote"/> without merging.</summary>
+    /// <exception cref="InvalidOperationException">The repository is not initialized or the remote does not exist.</exception>
+    void Fetch(string remote = "origin");
 }

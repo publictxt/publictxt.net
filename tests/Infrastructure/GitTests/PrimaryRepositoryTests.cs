@@ -110,19 +110,169 @@ public class PrimaryRepositoryTests : IDisposable
     [Fact]
     public void Checkout_SwitchesBranch()
     {
+        var repo = InitWithCommit();
+        repo.CreateBranch("feature");
+
+        repo.Checkout("feature");
+
+        Assert.Equal("feature", repo.CurrentBranch);
+    }
+
+    [Fact]
+    public void Checkout_Throws_WhenBranchMissing()
+    {
+        var repo = InitWithCommit();
+        Assert.Throws<InvalidOperationException>(() => repo.Checkout("nope"));
+    }
+
+    // ── branches ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void CreateBranch_AddsLocalBranch_WithoutSwitching()
+    {
+        var repo = InitWithCommit();
+        var before = repo.CurrentBranch;
+
+        repo.CreateBranch("topic/one");
+
+        Assert.Equal(before, repo.CurrentBranch);
+        Assert.Contains("topic/one", repo.GetLocalBranches());
+    }
+
+    [Fact]
+    public void CreateBranch_WithCheckout_SwitchesToIt()
+    {
+        var repo = InitWithCommit();
+
+        repo.CreateBranch("topic/two", checkout: true);
+
+        Assert.Equal("topic/two", repo.CurrentBranch);
+    }
+
+    [Fact]
+    public void CreateBranch_Throws_WhenBranchExists()
+    {
+        var repo = InitWithCommit();
+        repo.CreateBranch("dup");
+
+        var ex = Assert.Throws<InvalidOperationException>(() => repo.CreateBranch("dup"));
+        Assert.Contains("already exists", ex.Message);
+    }
+
+    [Fact]
+    public void CreateBranch_Throws_WhenNoCommits()
+    {
         var repo = new PrimaryRepository(_repoPath);
         repo.Init();
 
+        Assert.Throws<InvalidOperationException>(() => repo.CreateBranch("early"));
+    }
+
+    // ── remotes ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void AddRemote_ThenGetRemotes_ListsIt()
+    {
+        var repo = InitWithCommit();
+
+        repo.AddRemote("origin", "https://example.com/repo.git");
+
+        var remote = Assert.Single(repo.GetRemotes());
+        Assert.Equal("origin", remote.Name);
+        Assert.Equal("https://example.com/repo.git", remote.Url);
+    }
+
+    [Fact]
+    public void AddRemote_Throws_WhenNameExists()
+    {
+        var repo = InitWithCommit();
+        repo.AddRemote("origin", "https://example.com/a.git");
+
+        Assert.Throws<InvalidOperationException>(() => repo.AddRemote("origin", "https://example.com/b.git"));
+    }
+
+    [Fact]
+    public void RemoveRemote_RemovesIt()
+    {
+        var repo = InitWithCommit();
+        repo.AddRemote("origin", "https://example.com/repo.git");
+
+        repo.RemoveRemote("origin");
+
+        Assert.Empty(repo.GetRemotes());
+    }
+
+    [Fact]
+    public void RemoveRemote_Throws_WhenMissing()
+    {
+        var repo = InitWithCommit();
+        Assert.Throws<InvalidOperationException>(() => repo.RemoveRemote("missing"));
+    }
+
+    [Fact]
+    public void GetRemotes_IsEmpty_BeforeInit()
+    {
+        var repo = new PrimaryRepository(_repoPath);
+        Assert.Empty(repo.GetRemotes());
+    }
+
+    // ── commit / tracking / fetch guards ─────────────────────────────────────
+
+    [Fact]
+    public void Commit_Throws_WhenNothingStaged()
+    {
+        var repo = InitWithCommit();
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => repo.Commit("empty", new GitIdentity("Bot", "bot@example.com")));
+
+        Assert.Contains("Nothing to commit", ex.Message);
+    }
+
+    [Fact]
+    public void GetTrackingStatus_IsNone_ForLocalOnlyRepository()
+    {
+        var repo = InitWithCommit();
+
+        var tracking = repo.GetTrackingStatus();
+
+        Assert.False(tracking.IsTracking);
+        Assert.Null(tracking.UpstreamBranch);
+        Assert.True(tracking.IsUpToDate);
+    }
+
+    [Fact]
+    public void GetTrackingStatus_Throws_BeforeInit()
+    {
+        var repo = new PrimaryRepository(_repoPath);
+        Assert.Throws<InvalidOperationException>(() => repo.GetTrackingStatus());
+    }
+
+    [Fact]
+    public void Fetch_Throws_BeforeInit()
+    {
+        var repo = new PrimaryRepository(_repoPath);
+        Assert.Throws<InvalidOperationException>(() => repo.Fetch());
+    }
+
+    [Fact]
+    public void Fetch_Throws_WhenRemoteMissing()
+    {
+        var repo = InitWithCommit();
+        var ex = Assert.Throws<InvalidOperationException>(() => repo.Fetch("missing"));
+        Assert.Contains("Remote 'missing' not found", ex.Message);
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private PrimaryRepository InitWithCommit()
+    {
+        var repo = new PrimaryRepository(_repoPath);
+        repo.Init();
         File.WriteAllText(Path.Combine(_repoPath, "a.txt"), "a");
         repo.StageAll();
         repo.Commit("init", new GitIdentity("Bot", "bot@example.com"));
-
-        // Create a second branch via LibGit2Sharp directly so we can check it out
-        using var raw = new LibGit2Sharp.Repository(_repoPath);
-        raw.Branches.Add("feature", raw.Head.Tip);
-
-        repo.Checkout("feature");
-        Assert.Equal("feature", repo.CurrentBranch);
+        return repo;
     }
 
     [Fact]
