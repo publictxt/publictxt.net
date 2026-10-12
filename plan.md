@@ -164,6 +164,47 @@ Create the four projects under `src/Features/` (each references Core only, per l
 - [ ] **Blazor web** later; needs the credential-storage decision (spec open question) resolved for a browser context.
 - [ ] Shared view-model / application layer between the two so the CLI, desktop and web all call the same services.
 
+### 7.1 `feature/read-local-wiki` — first Blazor WASM slice (planned 2026-10-12)
+
+Goal: a **read-only, offline-capable** Blazor WebAssembly app that loads a wiki from the user's machine, persists it in the browser, and renders pages with links and backlinks. No git, no editing, no subscriptions.
+
+**Constraints that shape it**
+
+- LibGit2Sharp is native and does not run in WASM → the app references **Core (+ Wiki) only**, never `PublicTxt.Git`. Content arrives as files, not via git.
+- `InstanceContentReader`, `InstanceLayout`, `TxtInstanceSettingsStore` and `SubscriptionStore` call `File`/`Directory` directly → Core needs a file-source seam first.
+- Rendered Markdown is untrusted (subscriptions later) → render with raw HTML disabled.
+
+**Storage decision**
+
+| Option | Verdict |
+| --- | --- |
+| `localStorage` | No. ~5 MB cap, synchronous (blocks UI), strings only. Fine for UI prefs only. |
+| SQLite in WASM (`Microsoft.Data.Sqlite` + e_sqlite3, persisted to OPFS/IndexedDB) | Not yet. Adds ~1–2 MB download, native-build toolchain, and a manual MEMFS→OPFS persistence step. Earns its place when M5 (FTS5) exists and can be shared with desktop. |
+| **OPFS** (Origin Private File System) for raw `.md` files + in-memory `ContentCatalog` | **Yes.** Files stay the source of truth (same rule as M5: the index is a rebuildable cache). Catalog rebuilds on load, exactly as the CLI does today. |
+
+Revisit SQLite when either: load-time parse > ~1 s on a real instance, or full-text search is required. Cheap middle step first: cache the parsed catalog as JSON in OPFS keyed by a content hash.
+
+**Branches (keep PRs small; one concern each)**
+
+1. `refactor/core-file-source` — no behaviour change.
+   - [ ] `IInstanceFileSource` in Core: `EnumerateFiles(dir)`, `ReadAllText(path)`, `Exists(path)`, `LastModified(path)`. Sync on purpose; the browser loads everything into memory before Core runs.
+   - [ ] `PhysicalFileSource` (current behaviour, root-escape guard moves here) and `InMemoryFileSource` (dictionary of path → text + mtime).
+   - [ ] `InstanceContentReader`, `TxtInstanceSettingsStore` read via the seam; existing constructors keep working (default to physical).
+   - [ ] Core tests run the fixture through both sources and assert identical catalogs.
+2. `feature/wiki-service` (M4 §5 item) — `src/Features/PublicTxt.Wiki`, Core-only.
+   - [ ] Page lookup by name/path (case-insensitive, extensionless), backlinks, index (alphabetical + by tag).
+   - [ ] `WikiRenderer`: Markdig pipeline with `DisableHtml()`, internal links rewritten to app routes, broken links marked.
+3. `feature/read-local-wiki` — `src/Apps/PublicTxt.Blazor` (`blazorwasm --pwa`).
+   - [ ] Import: `<InputFile webkitdirectory multiple>` (works in all current browsers; one-time copy). File System Access API live folder handle is a Chromium-only enhancement, later.
+   - [ ] Persist imported files to OPFS via a small JS module; load OPFS → `InMemoryFileSource` → catalog at startup.
+   - [ ] Pages: home (wiki index), `/wiki/{*path}` (rendered page + backlinks + tags), `/tags/{tag}`, simple title/body search over the in-memory catalog.
+   - [ ] Offline: PWA service worker caches the app shell; verify with network disabled after first load. Show "re-import" when content is stale.
+   - [ ] Trimming: YamlDotNet uses reflection → check publish-trimmed warnings; root the assembly or use its static context if front matter breaks.
+   - [ ] Tests: bUnit for page components; Playwright smoke (import fixture folder → navigate a link → backlink visible → reload offline).
+   - [ ] CI: add `dotnet publish -c Release` of the Blazor app so trim/AOT regressions fail the build.
+
+**Explicitly later**: fetching a published instance over HTTP (needs a `manifest.json` from `publish`, since static hosts can't list directories), git in the browser (isomorphic-git needs a CORS proxy for GitHub), editing/write-back, credential storage for web (§8).
+
 ---
 
 ## 8. Open decisions to close (from spec §8, with suggested defaults)
