@@ -140,7 +140,7 @@ Goal from spec: subscribe to a remote PublicTxt repo with simple filters. Landed
 
 Create the four projects under `src/Features/` (each references Core only, per layering rules) and give each a thin service interface. Keep them small; most value is in Core + Git.
 
-- [ ] `PublicTxt.Wiki` — page lookup by name/path, backlinks, index generation.
+- [x] `PublicTxt.Wiki` — page lookup by name/path, backlinks, index generation (2026-10-12, see §7.1 step 2).
 - [ ] `PublicTxt.Blog` — posts by date range, "new post for today" helper honouring the `yyyy/MM/dd` layout, feed/index generation.
 - [ ] `PublicTxt.Bookmarks` — site/URL → filename mapping (`www.example.com-folder-page.md`), bookmark/annotation records.
 - [ ] `PublicTxt.Community` — placeholder only; explicitly deferred by the big-pic doc.
@@ -192,9 +192,12 @@ Revisit SQLite when either: load-time parse > ~1 s on a real instance, or full-t
    - [x] `InstanceContentReader`, `TxtInstanceSettingsStore.Load` and `InstanceLayout.IsInstance` take a source; path-based overloads unchanged. `InstanceContentReader.RootPath` replaced by `Source`.
    - [x] Reader and catalog tests run against both sources; a parity test asserts identical catalogs. Write paths (`Save`, `CreateSkeleton`) and `SubscriptionStore` stay disk-only (the browser slice is read-only).
    - [ ] Found while doing this, **pre-existing, fails on Linux**: `SubscriptionService.Remove("ALICE")` deletes the cache using the typed name, not the stored one, so on a case-sensitive file system the `alice` cache survives (`SubscriptionServiceTests.Remove_DeletesEntryAndCache`). One-line fix: delete by the removed entry's `Name`.
-2. `feature/wiki-service` (M4 §5 item) — `src/Features/PublicTxt.Wiki`, Core-only.
-   - [ ] Page lookup by name/path (case-insensitive, extensionless), backlinks, index (alphabetical + by tag).
-   - [ ] `WikiRenderer`: Markdig pipeline with `DisableHtml()`, internal links rewritten to app routes, broken links marked.
+2. `feature/wiki-service` (M4 §5 item) — `src/Features/PublicTxt.Wiki`, Core-only. **Done 2026-10-12.**
+   - [x] `WikiService`: `Find` by path (instance- or wiki-relative, extension optional), then file name, then title, case-insensitive; `Home` (`index` → `home` → `readme`); `Backlinks` from any content type; `AlphabeticalIndex` and `TagIndex`.
+   - [x] **Renderer moved to Core** as `HtmlContentRenderer` (not `WikiRenderer`): Blog needs it too and `Features.*` must not reference each other. `ContentUrls` maps paths to client URLs (default `/wiki/page`, extension dropped).
+   - [x] Untrusted-content rules, each with a test that fails when the guard is removed: raw HTML escaped (`DisableHtml`); extensions picked individually (no `UseAdvancedExtensions`, whose generic attributes allow `{onclick=…}`); external URLs limited to `http`/`https`/`mailto` (covers `javascript:`, entity-encoded, reference-style, images, `<autolinks>`); internal links always rewritten via `ContentUrls`, broken ones get `broken-link`.
+   - [x] `ContentCatalog.Resolve(item, link)` is public and the catalog builds its links through it, so rendering and link checks cannot disagree. `MarkdownContentParser.Classify` is public.
+   - [ ] Follow-ups: remote images still load (privacy/tracking); consider an option to proxy or block them. `Find` returns the first match on ambiguous names; a disambiguation page can come with the UI. Wiki-link syntax (`[[page]]`) is still WikiTool's job (§8).
 3. `feature/read-local-wiki` — `src/Apps/PublicTxt.Blazor` (`blazorwasm --pwa`).
    - [ ] Import: `<InputFile webkitdirectory multiple>` (works in all current browsers; one-time copy). File System Access API live folder handle is a Chromium-only enhancement, later.
    - [ ] Persist imported files to OPFS via a small JS module; load OPFS → `InMemoryFileSource` → catalog at startup.

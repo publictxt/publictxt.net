@@ -29,7 +29,7 @@ src/
   Core/
     PublicTxt.Core              — domain models, parsing, content services
   Features/
-    PublicTxt.Wiki              — wiki content service        (placeholder)
+    PublicTxt.Wiki              — wiki content service
     PublicTxt.Blog              — blog content service        (placeholder)
     PublicTxt.Community         — community content service   (placeholder)
     PublicTxt.Bookmarks         — bookmarks content service   (placeholder)

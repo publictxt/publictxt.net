@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Core\PublicTxt.Core\PublicTxt.Core.csproj" />
+    </ItemGroup>
+
+</Project>

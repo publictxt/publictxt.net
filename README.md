@@ -17,10 +17,11 @@ Usable from the command line: create an instance, write Markdown, sync it with a
 
 | Project | Path | Status |
 | --- | --- | --- |
-| PublicTxt.Core | `src/Core/PublicTxt.Core` | Models, Markdown parsing (Markdig), instance layout, settings, content catalog with link resolution, subscriptions and aggregate view |
+| PublicTxt.Core | `src/Core/PublicTxt.Core` | Models, Markdown parsing (Markdig), instance layout, settings, content catalog with link resolution, subscriptions and aggregate view, file sources (disk / in-memory), safe HTML rendering |
 | PublicTxt.Git | `src/Infrastructure/PublicTxt.Git` | Implemented over LibGit2Sharp: sync cycle, credentials, tracking status, read-any-ref, subscription caches |
 | PublicTxt.CLI | `src/Apps/PublicTxt.CLI` | `publictxt` tool: init, clone, status, list, show, links, commit, sync, publish, subscriptions |
-| PublicTxt.Wiki / Blog / Bookmarks / Community | `src/Features/*` | Planned |
+| PublicTxt.Wiki | `src/Features/PublicTxt.Wiki` | `WikiService`: page lookup, home page, backlinks, alphabetical and tag indexes |
+| PublicTxt.Blog / Bookmarks / Community | `src/Features/*` | Planned |
 | PublicTxt.Data | `src/Infrastructure/PublicTxt.Data` | Planned |
 | PublicTxt.Avalonia / PublicTxt.Blazor | `src/Apps/*` | Planned |
 
