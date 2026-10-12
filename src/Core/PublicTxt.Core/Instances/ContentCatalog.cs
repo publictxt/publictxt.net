@@ -23,6 +23,7 @@ public sealed class ContentCatalog
 {
     private readonly Dictionary<string, ContentItem> _byPath;
     private readonly ILookup<string, ResolvedLink> _incoming;
+    private readonly Func<string, bool> _fileExists;
 
     public IReadOnlyList<ContentItem> Items { get; }
 
@@ -34,12 +35,13 @@ public sealed class ContentCatalog
     /// <summary>Distinct tags, case-insensitive, sorted.</summary>
     public IReadOnlyList<string> Tags { get; }
 
-    private ContentCatalog(IReadOnlyList<ContentItem> items, IReadOnlyList<ResolvedLink> links)
+    private ContentCatalog(IReadOnlyList<ContentItem> items, Func<string, bool> fileExists)
     {
         Items = items;
-        Links = links;
+        _fileExists = fileExists;
         _byPath = items.ToDictionary(i => i.RelativePath, StringComparer.OrdinalIgnoreCase);
-        _incoming = links.Where(l => l.Target is not null).ToLookup(l => l.Target!.RelativePath, StringComparer.OrdinalIgnoreCase);
+        Links = items.SelectMany(i => i.InternalLinks.Select(l => Resolve(i, l))).ToList();
+        _incoming = Links.Where(l => l.Target is not null).ToLookup(l => l.Target!.RelativePath, StringComparer.OrdinalIgnoreCase);
         Tags = items.SelectMany(i => i.Tags)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
@@ -64,45 +66,35 @@ public sealed class ContentCatalog
         return Links.Where(l => l.Source.RelativePath.Equals(path, StringComparison.OrdinalIgnoreCase));
     }
 
-    internal static ContentCatalog Build(InstanceContentReader reader)
+    internal static ContentCatalog Build(InstanceContentReader reader) =>
+        new(reader.EnumerateAll().ToList(), path => SafeFileExists(reader, path));
+
+    /// <summary>
+    /// Resolves an internal link written in <paramref name="source"/>: a catalogued Markdown item first, then
+    /// any other file (e.g. media). A target without an extension refers to a Markdown page.
+    /// </summary>
+    /// <exception cref="ArgumentException">The link is not <see cref="ContentLinkKind.Internal"/>.</exception>
+    public ResolvedLink Resolve(ContentItem source, ContentLink link)
     {
-        var items = reader.EnumerateAll().ToList();
-        var byPath = items.ToDictionary(i => i.RelativePath, StringComparer.OrdinalIgnoreCase);
-        var links = new List<ResolvedLink>();
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(link);
+        if (link.Kind != ContentLinkKind.Internal)
+            throw new ArgumentException($"Only internal links can be resolved, not {link.Kind}.", nameof(link));
 
-        foreach (var item in items)
+        var resolved = ResolveTarget(source.Directory, link.Target);
+        if (resolved is null)
+            return new ResolvedLink(source, link, null, null, false);
+
+        var candidates = HasExtension(resolved) ? new[] { resolved } : new[] { resolved + ".md", resolved };
+        foreach (var candidate in candidates)
         {
-            foreach (var link in item.InternalLinks)
-            {
-                var resolved = ResolveTarget(item.Directory, link.Target);
-                if (resolved is null)
-                {
-                    links.Add(new ResolvedLink(item, link, null, null, false));
-                    continue;
-                }
-
-                // A target without an extension refers to a Markdown page.
-                var candidates = HasExtension(resolved) ? new[] { resolved } : new[] { resolved + ".md", resolved };
-                ResolvedLink? found = null;
-                foreach (var candidate in candidates)
-                {
-                    if (byPath.TryGetValue(candidate, out var target))
-                    {
-                        found = new ResolvedLink(item, link, candidate, target, true);
-                        break;
-                    }
-                    if (SafeFileExists(reader, candidate))
-                    {
-                        found = new ResolvedLink(item, link, candidate, null, true);
-                        break;
-                    }
-                }
-
-                links.Add(found ?? new ResolvedLink(item, link, candidates[0], null, false));
-            }
+            if (_byPath.TryGetValue(candidate, out var target))
+                return new ResolvedLink(source, link, candidate, target, true);
+            if (_fileExists(candidate))
+                return new ResolvedLink(source, link, candidate, null, true);
         }
 
-        return new ContentCatalog(items, links);
+        return new ResolvedLink(source, link, candidates[0], null, false);
     }
 
     /// <summary>

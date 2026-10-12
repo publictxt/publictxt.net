@@ -151,7 +151,8 @@ public sealed partial class MarkdownContentParser
         return links;
     }
 
-    internal static ContentLink Classify(string url, string? text, bool isImage)
+    /// <summary>Splits a link destination into target and fragment and classifies it as internal, external or anchor.</summary>
+    public static ContentLink Classify(string url, string? text = null, bool isImage = false)
     {
         var hash = url.IndexOf('#');
         var fragment = hash >= 0 ? url[(hash + 1)..] : null;
