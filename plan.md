@@ -203,8 +203,20 @@ Revisit SQLite when either: load-time parse > ~1 s on a real instance, or full-t
    - [ ] Trimming: YamlDotNet uses reflection → check publish-trimmed warnings; root the assembly or use its static context if front matter breaks.
    - [ ] Tests: bUnit for page components; Playwright smoke (import fixture folder → navigate a link → backlink visible → reload offline).
    - [ ] CI: add `dotnet publish -c Release` of the Blazor app so trim/AOT regressions fail the build.
+4. `feature/local-write` — edit pages in the WASM app and write them back to a real local folder.
+   - **Mechanism: File System Access API** (`showDirectoryPicker({ mode: "readwrite" })`). Chromium only (Chrome, Edge, Opera); Firefox and Safari have no folder picker. Those browsers fall back to OPFS (writes persist in the browser, not on disk) plus "download as zip".
+   - [ ] Core: `IInstanceFileWriter` (`WriteAllTextAsync`, `DeleteAsync`), separate from the sync read-only `IInstanceFileSource`. Browser I/O is async; reads stay sync over the in-memory copy.
+   - [ ] App service: write-through. Update `InMemoryFileSource` first (instant UI), then flush to the writer; on failure roll back the memory copy and show the error.
+   - [ ] JS module (~50 lines, `wwwroot/js/fs.js`): pick folder, read tree into memory, `getDirectoryHandle`/`getFileHandle({ create: true })` → `createWritable()` → `write` → `close` (the file only lands on disk at `close`).
+   - [ ] Persist the directory handle in IndexedDB; on reload call `requestPermission()` from a user gesture ("Reconnect folder" button). Never assume permission survives.
+   - [ ] External changes: there is no file watcher. Before each save compare the file's `lastModified` with the loaded value; if it changed, stop and show a conflict (never overwrite silently). Rescan on window focus.
+   - [ ] Writers: `FileSystemAccessWriter` (Chromium, real folder) and `OpfsWriter` (fallback). Feature-detect `window.showDirectoryPicker`; the UI states which mode is active.
+   - [ ] New pages: honour layout conventions (wiki path, blog `yyyy/MM/dd`); reuse `BlogPathConvention`.
+   - [ ] Git stays outside the browser: the user runs `publictxt sync` (CLI) or the desktop app to commit/push. The app shows "uncommitted changes" only as far as it knows (files it wrote this session).
+   - [ ] Tests: writer contract tests against an in-memory fake; Playwright on Chromium for pick → edit → file on disk (the picker needs a stub or a CDP override in CI).
+   - **Alternative if cross-browser disk writes or in-app git become required:** a localhost host (`publictxt serve`) serving the WASM app plus a small file/git API backed by `PhysicalFileSource` and `PublicTxt.Git`. Works in every browser and offline, but needs a running local process. Decide after real use of the Chromium path.
 
-**Explicitly later**: fetching a published instance over HTTP (needs a `manifest.json` from `publish`, since static hosts can't list directories), git in the browser (isomorphic-git needs a CORS proxy for GitHub), editing/write-back, credential storage for web (§8).
+**Explicitly later**: fetching a published instance over HTTP (needs a `manifest.json` from `publish`, since static hosts can't list directories), git in the browser (isomorphic-git needs a CORS proxy for GitHub), credential storage for web (§8).
 
 ---
 
