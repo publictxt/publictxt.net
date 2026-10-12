@@ -4,15 +4,20 @@ using PublicTxt.Core.Models;
 
 namespace CoreTests;
 
-public class InstanceContentReaderTests
+/// <summary>Every reader test runs against the fixture on disk and the same files in memory.</summary>
+public abstract class InstanceContentReaderTests
 {
-    private readonly InstanceContentReader _reader = InstanceContentReader.Open(Fixtures.SampleInstance);
+    private readonly InstanceContentReader _reader;
+
+    protected InstanceContentReaderTests(IInstanceFileSource source)
+    {
+        _reader = InstanceContentReader.Open(source);
+    }
 
     [Fact]
     public void Open_LoadsFixtureSettings()
     {
         Assert.Equal("wiki", _reader.Settings.WikiPath);
-        Assert.Equal(Path.GetFullPath(Fixtures.SampleInstance), _reader.RootPath);
     }
 
     [Fact]
@@ -94,14 +99,31 @@ public class InstanceContentReaderTests
     [Fact]
     public void Enumerate_WithMissingDirectory_IsEmpty()
     {
-        var reader = new InstanceContentReader(Fixtures.SampleInstance, new TxtInstanceSettings { WikiPath = "not-there" });
+        var reader = new InstanceContentReader(_reader.Source, new TxtInstanceSettings { WikiPath = "not-there" });
         Assert.Empty(reader.Enumerate(ContentType.Wiki));
     }
 }
 
-public class ContentCatalogTests
+public sealed class InstanceContentReaderOnDiskTests() : InstanceContentReaderTests(new PhysicalFileSource(Fixtures.SampleInstance))
 {
-    private readonly ContentCatalog _catalog = InstanceContentReader.Open(Fixtures.SampleInstance).BuildCatalog();
+    [Fact]
+    public void Open_FromPath_UsesPhysicalSourceAtFullPath()
+    {
+        var source = Assert.IsType<PhysicalFileSource>(InstanceContentReader.Open(Fixtures.SampleInstance).Source);
+        Assert.Equal(Path.GetFullPath(Fixtures.SampleInstance), source.RootPath);
+    }
+}
+
+public sealed class InstanceContentReaderInMemoryTests() : InstanceContentReaderTests(Fixtures.LoadSampleInstanceIntoMemory());
+
+public abstract class ContentCatalogTests
+{
+    private readonly ContentCatalog _catalog;
+
+    protected ContentCatalogTests(IInstanceFileSource source)
+    {
+        _catalog = InstanceContentReader.Open(source).BuildCatalog();
+    }
 
     [Fact]
     public void Items_AndLookups()
@@ -162,7 +184,14 @@ public class ContentCatalogTests
         Assert.Equal(new[] { "wiki/recipes/sourdough.md" }, _catalog.Backlinks("wiki/recipes/no-ext-page.md").Select(i => i.RelativePath));
         Assert.Empty(_catalog.Backlinks("wiki/missing-page.md"));
     }
+}
 
+public sealed class ContentCatalogOnDiskTests() : ContentCatalogTests(new PhysicalFileSource(Fixtures.SampleInstance));
+
+public sealed class ContentCatalogInMemoryTests() : ContentCatalogTests(Fixtures.LoadSampleInstanceIntoMemory());
+
+public class ResolveTargetTests
+{
     [Theory]
     [InlineData("wiki", "page.md", "wiki/page.md")]
     [InlineData("wiki/recipes", "../index.md", "wiki/index.md")]

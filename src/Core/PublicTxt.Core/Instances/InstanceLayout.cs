@@ -21,7 +21,11 @@ public static class InstanceLayout
 
     /// <summary>True when <paramref name="rootPath"/> contains a settings file.</summary>
     public static bool IsInstance(string rootPath) =>
-        !string.IsNullOrWhiteSpace(rootPath) && File.Exists(SettingsFilePath(rootPath));
+        !string.IsNullOrWhiteSpace(rootPath) && IsInstance(new PhysicalFileSource(rootPath));
+
+    /// <summary>True when <paramref name="source"/> contains a settings file.</summary>
+    public static bool IsInstance(IInstanceFileSource source) =>
+        source.FileExists(SettingsFileRelativePath);
 
     /// <summary>Content type → normalised relative directory (forward slashes, no trailing slash).</summary>
     public static IReadOnlyDictionary<ContentType, string> ContentPaths(TxtInstanceSettings settings)

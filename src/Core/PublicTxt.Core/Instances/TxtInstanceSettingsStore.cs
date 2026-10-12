@@ -21,20 +21,24 @@ public sealed class TxtInstanceSettingsStore
 
     /// <summary>Loads the settings file, or returns defaults when it does not exist.</summary>
     /// <exception cref="InvalidOperationException">The file exists but is not valid JSON or fails validation.</exception>
-    public TxtInstanceSettings Load(string rootPath)
+    public TxtInstanceSettings Load(string rootPath) => Load(new PhysicalFileSource(rootPath));
+
+    /// <inheritdoc cref="Load(string)"/>
+    public TxtInstanceSettings Load(IInstanceFileSource source)
     {
-        var file = InstanceLayout.SettingsFilePath(rootPath);
-        if (!File.Exists(file))
+        ArgumentNullException.ThrowIfNull(source);
+        const string file = InstanceLayout.SettingsFileRelativePath;
+        if (!source.FileExists(file))
             return TxtInstanceSettings.CreateDefault();
 
         TxtInstanceSettings? settings;
         try
         {
-            settings = JsonSerializer.Deserialize<TxtInstanceSettings>(File.ReadAllText(file), Options);
+            settings = JsonSerializer.Deserialize<TxtInstanceSettings>(source.ReadAllText(file), Options);
         }
         catch (JsonException ex)
         {
-            throw new InvalidOperationException($"Settings file is not valid JSON: {file}", ex);
+            throw new InvalidOperationException($"Settings file is not valid JSON: {file} in {source}", ex);
         }
 
         settings ??= TxtInstanceSettings.CreateDefault();
@@ -42,7 +46,7 @@ public sealed class TxtInstanceSettingsStore
         var validation = settings.Validate();
         if (!validation.IsValid)
             throw new InvalidOperationException(
-                $"Settings file {file} is invalid: {string.Join("; ", validation.Errors)}");
+                $"Settings file {file} in {source} is invalid: {string.Join("; ", validation.Errors)}");
 
         return settings;
     }

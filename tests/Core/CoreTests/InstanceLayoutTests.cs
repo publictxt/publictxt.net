@@ -22,6 +22,23 @@ internal static class Fixtures
         }
     }
 
+    /// <summary>
+    /// Copies every fixture file (hidden ones included) into an <see cref="InMemoryFileSource"/>, keeping
+    /// modification times. Binary files are added with empty text, as the browser client will.
+    /// </summary>
+    public static InMemoryFileSource LoadSampleInstanceIntoMemory()
+    {
+        var root = SampleInstance;
+        var source = new InMemoryFileSource();
+        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+            var text = Path.GetExtension(file) is ".md" or ".json" ? File.ReadAllText(file) : string.Empty;
+            source.Add(relative, text, new DateTimeOffset(File.GetLastWriteTimeUtc(file), TimeSpan.Zero));
+        }
+        return source;
+    }
+
     public static string TempDir(string prefix)
     {
         var path = Path.Combine(Path.GetTempPath(), $"publictxt-core-{prefix}-{Guid.NewGuid():N}");

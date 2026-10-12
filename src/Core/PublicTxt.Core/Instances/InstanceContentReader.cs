@@ -3,7 +3,7 @@ using PublicTxt.Core.Models;
 
 namespace PublicTxt.Core.Instances;
 
-/// <summary>Enumerates and parses the content of an instance on disk according to its settings.</summary>
+/// <summary>Enumerates and parses the content of an instance according to its settings.</summary>
 public sealed class InstanceContentReader
 {
     private static readonly string[] MarkdownExtensions = [".md", ".markdown"];
@@ -11,15 +11,20 @@ public sealed class InstanceContentReader
     private readonly MarkdownContentParser _parser;
     private readonly IReadOnlyDictionary<ContentType, string> _paths;
 
-    public string RootPath { get; }
+    public IInstanceFileSource Source { get; }
     public TxtInstanceSettings Settings { get; }
 
     public InstanceContentReader(string rootPath, TxtInstanceSettings settings, MarkdownContentParser? parser = null)
+        : this(new PhysicalFileSource(rootPath), settings, parser)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
+    }
+
+    public InstanceContentReader(IInstanceFileSource source, TxtInstanceSettings settings, MarkdownContentParser? parser = null)
+    {
+        ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(settings);
 
-        RootPath = Path.GetFullPath(rootPath);
+        Source = source;
         Settings = settings;
         _parser = parser ?? MarkdownContentParser.Default;
         _paths = InstanceLayout.ContentPaths(settings);
@@ -27,7 +32,11 @@ public sealed class InstanceContentReader
 
     /// <summary>Opens the instance at <paramref name="rootPath"/>, loading its settings file (or defaults).</summary>
     public static InstanceContentReader Open(string rootPath, MarkdownContentParser? parser = null) =>
-        new(rootPath, new TxtInstanceSettingsStore().Load(rootPath), parser);
+        Open(new PhysicalFileSource(rootPath), parser);
+
+    /// <summary>Opens the instance held by <paramref name="source"/>, loading its settings file (or defaults).</summary>
+    public static InstanceContentReader Open(IInstanceFileSource source, MarkdownContentParser? parser = null) =>
+        new(source, new TxtInstanceSettingsStore().Load(source), parser);
 
     /// <summary>
     /// All files (any extension) under a content type's directory as instance-relative forward-slash
@@ -38,11 +47,7 @@ public sealed class InstanceContentReader
         if (!_paths.TryGetValue(type, out var dir))
             return Enumerable.Empty<string>();
 
-        var full = ToFullPath(dir);
-        if (!Directory.Exists(full))
-            return Enumerable.Empty<string>();
-
-        return Walk(full).Select(ToRelativePath).OrderBy(p => p, StringComparer.Ordinal).ToList();
+        return Walk(dir).OrderBy(p => p, StringComparer.Ordinal).ToList();
     }
 
     /// <summary>Parsed Markdown items of one content type.</summary>
@@ -79,49 +84,35 @@ public sealed class InstanceContentReader
 
     /// <summary>True when a file exists at the instance-relative path.</summary>
     /// <exception cref="UnauthorizedAccessException">The path escapes the instance root.</exception>
-    public bool FileExists(string relativePath) => File.Exists(ToFullPath(relativePath));
+    public bool FileExists(string relativePath) => Source.FileExists(relativePath);
 
     /// <summary>Builds a catalog of every item plus resolved links.</summary>
     public ContentCatalog BuildCatalog() => ContentCatalog.Build(this);
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private ContentItem ParseFile(string relativePath, ContentType type)
-    {
-        var full = ToFullPath(relativePath);
-        var text = File.ReadAllText(full);
-        var modified = new DateTimeOffset(File.GetLastWriteTimeUtc(full), TimeSpan.Zero);
-        return _parser.Parse(relativePath, type, text, modified);
-    }
+    private ContentItem ParseFile(string relativePath, ContentType type) =>
+        _parser.Parse(relativePath, type, Source.ReadAllText(relativePath), Source.GetLastModified(relativePath));
 
     private static bool IsMarkdown(string path) =>
         MarkdownExtensions.Any(ext => path.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
 
-    private static IEnumerable<string> Walk(string directory)
+    private IEnumerable<string> Walk(string directory)
     {
-        foreach (var file in Directory.EnumerateFiles(directory))
+        foreach (var file in Source.EnumerateFiles(directory))
         {
-            if (!Path.GetFileName(file).StartsWith('.'))
+            if (!IsHidden(file))
                 yield return file;
         }
 
-        foreach (var sub in Directory.EnumerateDirectories(directory))
+        foreach (var sub in Source.EnumerateDirectories(directory))
         {
-            if (Path.GetFileName(sub).StartsWith('.')) continue;
+            if (IsHidden(sub)) continue;
             foreach (var file in Walk(sub))
                 yield return file;
         }
     }
 
-    private string ToRelativePath(string fullPath) =>
-        Path.GetRelativePath(RootPath, fullPath).Replace('\\', '/');
-
-    internal string ToFullPath(string relativePath)
-    {
-        var candidate = Path.GetFullPath(Path.Combine(RootPath, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-        var relative = Path.GetRelativePath(RootPath, candidate);
-        if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
-            throw new UnauthorizedAccessException($"Path escapes the instance root: {relativePath}");
-        return candidate;
-    }
+    private static bool IsHidden(string relativePath) =>
+        relativePath[(relativePath.LastIndexOf('/') + 1)..].StartsWith('.');
 }

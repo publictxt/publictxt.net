@@ -186,11 +186,12 @@ Revisit SQLite when either: load-time parse > ~1 s on a real instance, or full-t
 
 **Branches (keep PRs small; one concern each)**
 
-1. `refactor/core-file-source` — no behaviour change.
-   - [ ] `IInstanceFileSource` in Core: `EnumerateFiles(dir)`, `ReadAllText(path)`, `Exists(path)`, `LastModified(path)`. Sync on purpose; the browser loads everything into memory before Core runs.
-   - [ ] `PhysicalFileSource` (current behaviour, root-escape guard moves here) and `InMemoryFileSource` (dictionary of path → text + mtime).
-   - [ ] `InstanceContentReader`, `TxtInstanceSettingsStore` read via the seam; existing constructors keep working (default to physical).
-   - [ ] Core tests run the fixture through both sources and assert identical catalogs.
+1. `refactor/core-file-source` — no behaviour change. **Done 2026-10-12.**
+   - [x] `IInstanceFileSource` in Core: `FileExists`, `DirectoryExists`, non-recursive `EnumerateFiles`/`EnumerateDirectories`, `ReadAllText`, `GetLastModified`. Sync on purpose; the browser loads everything into memory before Core runs. Non-recursive so the hidden-entry policy stays in one place (the reader's walk).
+   - [x] `PhysicalFileSource` (root-escape guard moved here) and `InMemoryFileSource` (case-sensitive like git, implicit directories, binary files added with empty text).
+   - [x] `InstanceContentReader`, `TxtInstanceSettingsStore.Load` and `InstanceLayout.IsInstance` take a source; path-based overloads unchanged. `InstanceContentReader.RootPath` replaced by `Source`.
+   - [x] Reader and catalog tests run against both sources; a parity test asserts identical catalogs. Write paths (`Save`, `CreateSkeleton`) and `SubscriptionStore` stay disk-only (the browser slice is read-only).
+   - [ ] Found while doing this, **pre-existing, fails on Linux**: `SubscriptionService.Remove("ALICE")` deletes the cache using the typed name, not the stored one, so on a case-sensitive file system the `alice` cache survives (`SubscriptionServiceTests.Remove_DeletesEntryAndCache`). One-line fix: delete by the removed entry's `Name`.
 2. `feature/wiki-service` (M4 §5 item) — `src/Features/PublicTxt.Wiki`, Core-only.
    - [ ] Page lookup by name/path (case-insensitive, extensionless), backlinks, index (alphabetical + by tag).
    - [ ] `WikiRenderer`: Markdig pipeline with `DisableHtml()`, internal links rewritten to app routes, broken links marked.
