@@ -1,9 +1,11 @@
-# Normalise line endings: the repository always stores LF.
-# Working copies are LF too, so shell scripts run and fixture-based tests behave the same on every OS.
-* text=auto eol=lf
+# Git's standard cross-platform setting: the repository stores LF, and working copies use the
+# platform's native ending (CRLF on Windows). Content parsing must therefore cope with both.
+* text=auto
 
-# Visual Studio expects CRLF solution files. The repository still stores LF, so tools that
-# write LF (dotnet sln on Linux) no longer produce whole-file diffs.
+# Shell scripts must stay LF on every platform.
+*.sh text eol=lf
+
+# Visual Studio expects CRLF solution files.
 *.sln text eol=crlf
 
 # Windows-only scripts

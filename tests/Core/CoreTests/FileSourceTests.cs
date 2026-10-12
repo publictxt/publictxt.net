@@ -112,6 +112,22 @@ public class FileSourceParityTests
     }
 
     [Fact]
+    public void CrlfCheckout_ProducesTheSameCatalog()
+    {
+        // What a Windows checkout of the fixture looks like under `* text=auto`.
+        var lf = Fixtures.LoadSampleInstanceIntoMemory();
+        var crlf = Fixtures.LoadSampleInstanceIntoMemory(text => text.Replace("\r\n", "\n").Replace("\n", "\r\n"));
+
+        var a = InstanceContentReader.Open(lf).BuildCatalog();
+        var b = InstanceContentReader.Open(crlf).BuildCatalog();
+
+        Assert.Equal(DescribeIgnoringBody(a.Items), DescribeIgnoringBody(b.Items));
+        Assert.Equal(
+            a.Links.Select(l => (l.Source.RelativePath, l.Link.Target, l.ResolvedPath, l.Exists)),
+            b.Links.Select(l => (l.Source.RelativePath, l.Link.Target, l.ResolvedPath, l.Exists)));
+    }
+
+    [Fact]
     public void InstanceDetection_AndSettings_WorkFromMemory()
     {
         var memory = Fixtures.LoadSampleInstanceIntoMemory();
@@ -132,6 +148,9 @@ public class FileSourceParityTests
         Assert.Contains(InstanceLayout.SettingsFileRelativePath, ex.Message);
         Assert.Contains("in-memory", ex.Message);
     }
+
+    private static IEnumerable<string> DescribeIgnoringBody(IEnumerable<PublicTxt.Core.Content.ContentItem> items) =>
+        items.Select(i => $"{i.RelativePath}|{i.Type}|{i.Title}|{i.Date}|{string.Join(',', i.Tags)}|{i.FrontMatter.Values.Count}");
 
     private static IEnumerable<string> Describe(IEnumerable<PublicTxt.Core.Content.ContentItem> items) =>
         items.Select(i => $"{i.RelativePath}|{i.Type}|{i.Title}|{i.Date}|{i.ModifiedAt:O}|{string.Join(',', i.Tags)}|{i.Body.Length}");

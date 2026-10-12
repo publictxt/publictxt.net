@@ -39,6 +39,7 @@ Done 2026-09-18 on branches `chore/docs-housekeeping`, `chore/ci`, `chore/dev-en
   git branch -d feature/change-metaweb-references-to-bookmarks chore/docs-housekeeping chore/ci chore/dev-env chore/build-props
   ```
 
+- [x] `.gitattributes` (2026-10-12): `* text=auto` (repo stores LF, native endings on checkout), `*.sh` LF, `*.sln`/`*.cmd`/`*.bat` CRLF. Parser and catalog have CRLF-vs-LF parity tests, since Windows users' wikis will be CRLF.
 - [x] `Directory.Build.props` (net10.0 / Nullable / ImplicitUsings), `Directory.Packages.props` (central package versions), and Core / Infrastructure / Apps / Tests solution folders.
 
 ---

@@ -190,4 +190,22 @@ public class MarkdownContentParserTests
         var item = _parser.Parse("wiki/x.md", ContentType.Wiki, "x", when);
         Assert.Equal(when, item.ModifiedAt);
     }
+
+    // ── line endings ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void CrlfInput_ParsesTheSameAsLf()
+    {
+        const string lf = "---\ntitle: T\ntags: [a, b]\ndate: 2024-05-06\n---\n\n# Heading\n\nSee [x](other.md) #inline\n";
+        var a = _parser.Parse("notes/n.md", ContentType.Notes, lf);
+        var b = _parser.Parse("notes/n.md", ContentType.Notes, lf.Replace("\n", "\r\n"));
+
+        Assert.Equal(a.Title, b.Title);
+        Assert.Equal(a.FrontMatter.GetString("title"), b.FrontMatter.GetString("title"));
+        Assert.Equal(a.Tags, b.Tags);
+        Assert.Equal(a.Date, b.Date);
+        Assert.Equal(a.Links, b.Links);
+        Assert.Equal(a.Body, b.Body.Replace("\r\n", "\n"));
+        Assert.StartsWith("# Heading", b.Body);
+    }
 }
