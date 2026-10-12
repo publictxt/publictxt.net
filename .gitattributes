@@ -1,0 +1,23 @@
+# Normalise line endings: the repository always stores LF.
+# Working copies are LF too, so shell scripts run and fixture-based tests behave the same on every OS.
+* text=auto eol=lf
+
+# Visual Studio expects CRLF solution files. The repository still stores LF, so tools that
+# write LF (dotnet sln on Linux) no longer produce whole-file diffs.
+*.sln text eol=crlf
+
+# Windows-only scripts
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.dll binary
+*.exe binary
