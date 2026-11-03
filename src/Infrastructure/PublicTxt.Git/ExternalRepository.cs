@@ -38,12 +38,17 @@ public sealed class ExternalRepository : GitRepositoryBase, IExternalRepository
         ArgumentException.ThrowIfNullOrWhiteSpace(remoteUrl);
         RemoteUrl = remoteUrl;
 
+        // A cache checked out before the settings existed may hold live symlinks; a reset would keep them.
+        if (IsInitialized && !HasCacheSettings())
+            DeleteCheckout();
+
         if (!IsInitialized)
         {
             Directory.CreateDirectory(LocalPath);
             try
             {
-                Repository.Clone(remoteUrl, LocalPath, BuildCloneOptions(new CloneOptions(BranchName: branch)));
+                // No checkout yet: the cache settings below must be in place before any file is written.
+                Repository.Clone(remoteUrl, LocalPath, BuildCloneOptions(new CloneOptions(BranchName: branch, Checkout: false)));
             }
             catch (LibGit2SharpException ex) when (branch is not null && ex.Message.Contains(branch, StringComparison.Ordinal))
             {
@@ -56,6 +61,7 @@ public sealed class ExternalRepository : GitRepositoryBase, IExternalRepository
         }
 
         using var repo = Open();
+        ApplyCacheSettings(repo);
         var name = branch ?? DefaultRemoteBranch(repo) ?? repo.Head.FriendlyName;
         var remoteBranch = repo.Branches[$"origin/{name}"]
             ?? throw new InvalidOperationException($"Branch '{name}' not found on remote '{remoteUrl}'.");
@@ -67,6 +73,31 @@ public sealed class ExternalRepository : GitRepositoryBase, IExternalRepository
         repo.Reset(ResetMode.Hard, remoteBranch.Tip);
         repo.Branches.Update(local, b => b.TrackedBranch = remoteBranch.CanonicalName);
         return remoteBranch.Tip.Sha;
+    }
+
+    /// <summary>
+    /// Settings for a checkout of untrusted content. <c>core.symlinks=false</c> writes symbolic links as
+    /// plain files holding the target path, so a remote cannot point a page at a file outside the cache.
+    /// <c>core.autocrlf=false</c> keeps files byte-identical to their blobs whatever the user's global config.
+    /// </summary>
+    private static void ApplyCacheSettings(Repository repo)
+    {
+        repo.Config.Set("core.symlinks", false, ConfigurationLevel.Local);
+        repo.Config.Set("core.autocrlf", "false", ConfigurationLevel.Local);
+    }
+
+    private bool HasCacheSettings()
+    {
+        using var repo = Open();
+        return repo.Config.Get<bool>("core.symlinks", ConfigurationLevel.Local)?.Value == false;
+    }
+
+    private void DeleteCheckout()
+    {
+        // Git object files are read-only on Windows; clear attributes before deleting.
+        foreach (var file in Directory.EnumerateFiles(LocalPath, "*", SearchOption.AllDirectories))
+            File.SetAttributes(file, FileAttributes.Normal);
+        Directory.Delete(LocalPath, recursive: true);
     }
 
     private static string? DefaultRemoteBranch(Repository repo)

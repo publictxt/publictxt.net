@@ -19,7 +19,9 @@ public interface IExternalRepository : IGitRepository
     /// Ensures the clone exists and its working tree is at the tip of <c>origin/&lt;branch&gt;</c>
     /// (the remote's default branch when null), fetching first. Unlike <see cref="CloneOrUpdate"/> this
     /// resets rather than fast-forwards, so it copes with force-pushed or switched branches; the clone is
-    /// treated as a disposable cache. Returns the resulting commit SHA.
+    /// treated as a disposable cache: it is checked out with symbolic links written as plain files and no
+    /// line-ending conversion, and a clone made without those settings is deleted and cloned again.
+    /// Returns the resulting commit SHA.
     /// </summary>
     /// <exception cref="InvalidOperationException">The branch does not exist on the remote.</exception>
     string UpdateToBranch(string remoteUrl, string? branch);

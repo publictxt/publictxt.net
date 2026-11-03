@@ -46,7 +46,7 @@ publictxt subscriptions list|update [name]|remove <name>
 publictxt list --all [--search text] [--timeline]     local + subscribed content, with a source column
 ```
 
-Subscription caches live under `<instance>/.publictxt/subscriptions/<name>` (git-ignored); the subscription list is `settings/subscriptions.json` and is meant to be committed.
+Subscription caches are full checkouts under `<instance>/remotes/<host>/<owner>/<repo>[@branch]` (git-ignored, keyed by canonical URL, shared by subscriptions to the same repo and branch; non-URL remotes go under `remotes/local/<name>-<hash>`). Content paths may not be the root or under `remotes/`. The subscription list is `settings/subscriptions.json` and is meant to be committed.
 
 All commands accept `--path`/`-C <dir>` (default: current directory). Author comes from `--author "Name <email>"`, then `PUBLICTXT_AUTHOR_NAME`/`PUBLICTXT_AUTHOR_EMAIL`, then git config. HTTPS token from `--token` or `PUBLICTXT_GIT_TOKEN`. SSH remotes are not supported (LibGit2Sharp lacks libssh2).
 

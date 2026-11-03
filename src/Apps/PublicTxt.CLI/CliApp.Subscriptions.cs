@@ -75,7 +75,7 @@ public sealed partial class CliApp
             WriteKeyValues(
                 ("filter", sub.Filter.Describe()),
                 ("items", count.ToString()),
-                ("cache", service.CachePathFor(sub.Name)));
+                ("cache", service.CachePathFor(sub)));
             _out.WriteLine();
             _out.WriteLine("Commit settings/subscriptions.json to keep this subscription with the instance.");
             return ExitOk;

@@ -42,7 +42,7 @@ public class SubscriptionCommandTests : IDisposable
         Assert.Contains("types=wiki -tags=draft", add.Out);
         Assert.Contains("items   1", add.Out);
         Assert.True(File.Exists(Path.Combine(_local, "settings", "subscriptions.json")));
-        Assert.Contains(".publictxt/", File.ReadAllText(Path.Combine(_local, ".gitignore")));
+        Assert.Contains("/remotes/", File.ReadAllText(Path.Combine(_local, ".gitignore")));
 
         var list = Cli.Run("subs", "ls", "-C", _local);
         Assert.Equal(CliApp.ExitOk, list.ExitCode);
@@ -55,7 +55,7 @@ public class SubscriptionCommandTests : IDisposable
 
         var remove = Cli.Run("subscriptions", "remove", "alice", "-C", _local);
         Assert.Equal(CliApp.ExitOk, remove.ExitCode);
-        Assert.False(Directory.Exists(Path.Combine(_local, ".publictxt", "subscriptions", "alice")));
+        Assert.False(Directory.Exists(Path.Combine(_local, "remotes", "local")));
         Assert.Contains("(none)", Cli.Run("subscriptions", "list", "-C", _local).Out);
 
         var removeAgain = Cli.Run("subscriptions", "rm", "alice", "-C", _local);
@@ -165,7 +165,7 @@ public class SubscriptionCommandTests : IDisposable
     public void List_All_WarnsAboutUnfetchedSubscription_ButStillListsLocal()
     {
         Cli.Run("subscriptions", "add", _aliceBare, "-C", _local, "--name", "alice");
-        Cli.Delete(Path.Combine(_local, ".publictxt", "subscriptions", "alice"));
+        Cli.Delete(Path.Combine(_local, "remotes"));
 
         var r = Cli.Run("list", "-a", "-C", _local);
 

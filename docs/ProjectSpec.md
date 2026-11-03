@@ -133,7 +133,8 @@ Subscriptions (M3):
 - `Subscription` / `SubscriptionFilter` (Core) — name, remote URL, optional branch, and a filter of content types, include/exclude path globs and include/exclude tags. Criteria are ANDed, values within a criterion ORed.
 - `SubscriptionStore` (Core) — persists the list at `settings/subscriptions.json`, committed with the instance.
 - `AggregateCatalog` (Core) — local items plus filtered subscribed items, each carrying a `Source`; a failing subscription is reported, not fatal.
-- `SubscriptionService` (Git) — one read-only clone per subscription under `<instance>/.publictxt/subscriptions/<name>` (git-ignored). Add clones before persisting; update hard-resets each cache to the followed branch so force pushes and branch switches are harmless.
+- `RepoUrl` / `RemoteCacheLayout` (Core) — canonical repo URL (`https://host/owner/repo`, same rules as the Obsidian plugin) and the cache path derived from it.
+- `SubscriptionService` (Git) — one read-only checkout per repository and branch under `<instance>/remotes/<host>/<owner>/<repo>[@branch]` (git-ignored), shared by subscriptions that follow the same repo and branch. Checkouts use `core.symlinks=false` and `core.autocrlf=false` because the content is untrusted. Add clones before persisting; update hard-resets each cache to the followed branch so force pushes and branch switches are harmless.
 
 Decisions recorded: pull/sync merge rather than rebase; `TxtInstance` stays a plain model and lifecycle lives in services.
 
@@ -183,7 +184,7 @@ Cross-platform desktop client. Out of scope for the initial milestone.
 - Notes content type — owned by Core, or its own feature project? (Parsing already lives in Core; a Notes feature project is only needed if notes gain behaviour beyond plain pages.)
 - Resolved (M2): **tags** come from both front matter `tags` and inline `#tag`, merged case-insensitively. **Settings** are JSON at `settings/instance.json`.
 - Conflict-resolution UX for origin sync. (Infrastructure now reports conflicts via `GitSyncResult.HasConflicts` / `GitStatus.Conflicted` and never auto-resolves; the UX is a client concern.)
-- Resolved (M3): subscribed content lives in **separate read-only clones outside the instance's tracked tree** (`.publictxt/subscriptions/`, git-ignored) and the aggregate view is computed. Importing selected pages into the instance and committing them remains a possible later feature.
+- Resolved (M3): subscribed content lives in **separate read-only clones outside the instance's tracked tree** (`remotes/`, git-ignored; moved from `.publictxt/subscriptions/` on 2026-11-03) and the aggregate view is computed. Importing selected pages into the instance and committing them remains a possible later feature.
 - Credential storage strategy across CLI / desktop / web. (`IGitCredentials` is the seam; CLI will start with the `PUBLICTXT_GIT_TOKEN` environment resolver.)
 - SSH support: not possible through LibGit2Sharp's bundled binaries. Options if needed: a git-CLI adapter, or HTTPS tokens only.
 

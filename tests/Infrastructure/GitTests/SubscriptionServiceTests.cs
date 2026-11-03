@@ -107,7 +107,8 @@ public class SubscriptionServiceTests : IDisposable
         Assert.True(result.Succeeded);
         Assert.True(result.Changed);
         Assert.True(_service.IsCached(result.Subscription));
-        Assert.True(Directory.Exists(Path.Combine(_local, ".publictxt", "subscriptions", "alice", ".git")));
+        Assert.True(Directory.Exists(Path.Combine(_service.CachePathFor(result.Subscription), ".git")));
+        Assert.StartsWith(Path.Combine(_local, "remotes", "local") + Path.DirectorySeparatorChar, _service.CachePathFor(result.Subscription));
 
         var listed = Assert.Single(_service.List());
         Assert.Equal("alice", listed.Name);
@@ -115,7 +116,7 @@ public class SubscriptionServiceTests : IDisposable
         Assert.NotNull(listed.LastUpdatedAt);
         Assert.Equal(result.CommitSha, listed.LastCommitSha);
 
-        Assert.Contains(".publictxt/", File.ReadAllText(Path.Combine(_local, ".gitignore")));
+        Assert.Contains("/remotes/", File.ReadAllText(Path.Combine(_local, ".gitignore")));
         Assert.True(new PrimaryRepository(_local).GetStatus().UntrackedCount > 0, "settings/subscriptions.json and .gitignore are new");
         var status = new PrimaryRepository(_local).GetStatus();
         Assert.Equal(2, status.UntrackedCount);
@@ -153,14 +154,103 @@ public class SubscriptionServiceTests : IDisposable
     [Fact]
     public void Remove_DeletesEntryAndCache()
     {
-        _service.Add(Alice());
-        var cache = _service.CachePathFor("alice");
+        var sub = _service.Add(Alice()).Subscription;
+        var cache = _service.CachePathFor(sub);
 
         Assert.True(_service.Remove("ALICE"));
 
         Assert.Empty(_service.List());
         Assert.False(Directory.Exists(cache));
+        Assert.False(Directory.Exists(Path.Combine(_local, "remotes", "local")), "empty parent folders are pruned");
         Assert.False(_service.Remove("alice"));
+    }
+
+    [Fact]
+    public void SameRepoAndBranch_ShareCache_KeptUntilLastSubscriptionRemoved()
+    {
+        var a = _service.Add(Alice()).Subscription;
+        var b = _service.Add(new Subscription { Name = "alice-blog", RemoteUrl = _aliceBare, Filter = new SubscriptionFilter { Types = [ContentType.Blog] } }).Subscription;
+        Assert.Equal(_service.CachePathFor(a), _service.CachePathFor(b));
+
+        _service.Remove("alice");
+        Assert.True(_service.IsCached(b));
+        Assert.Single(_service.Enumerate(b));
+
+        _service.Remove("alice-blog");
+        Assert.False(Directory.Exists(_service.CachePathFor(b)));
+    }
+
+    [Fact]
+    public void SameRepo_DifferentBranch_GetsOwnCache()
+    {
+        var main = _service.Add(Alice()).Subscription;
+        var topic = _service.Add(new Subscription { Name = "alice-soup", RemoteUrl = _aliceBare, Branch = "topic/soup" }).Subscription;
+
+        Assert.NotEqual(_service.CachePathFor(main), _service.CachePathFor(topic));
+        Assert.EndsWith("@topic~soup", _service.CachePathFor(topic));
+        Assert.DoesNotContain(_service.Enumerate(main), i => i.RelativePath == "wiki/recipes/soup.md");
+        Assert.Contains(_service.Enumerate(topic), i => i.RelativePath == "wiki/recipes/soup.md");
+    }
+
+    [Fact]
+    public void Update_RemovesLegacyCacheFolder()
+    {
+        _service.Add(Alice());
+        var legacy = Path.Combine(_local, ".publictxt", "subscriptions", "alice");
+        Directory.CreateDirectory(legacy);
+        File.WriteAllText(Path.Combine(legacy, "x"), "old");
+
+        _service.Update();
+
+        Assert.False(Directory.Exists(Path.Combine(_local, ".publictxt")));
+    }
+
+    [Fact]
+    public void Cache_WritesSymlinksAsPlainFiles_AndDisablesLineEndingConversion()
+    {
+        CommitSymlink(_aliceWork, "wiki/evil.md", "../../../../../../etc/passwd");
+        new PrimaryRepository(_aliceWork).Push();
+
+        var sub = _service.Add(Alice()).Subscription;
+        var cache = _service.CachePathFor(sub);
+
+        var file = new FileInfo(Path.Combine(cache, "wiki", "evil.md"));
+        Assert.True(file.Exists);
+        Assert.Null(file.LinkTarget);
+        Assert.Equal("../../../../../../etc/passwd", File.ReadAllText(file.FullName));
+
+        using var repo = new LibGit2Sharp.Repository(cache);
+        Assert.False(repo.Config.Get<bool>("core.symlinks").Value);
+        Assert.False(repo.Config.Get<bool>("core.autocrlf").Value);
+    }
+
+    [Fact]
+    public void Update_ReclonesCache_MadeWithoutSafeSettings()
+    {
+        var sub = _service.Add(Alice()).Subscription;
+        var cache = _service.CachePathFor(sub);
+        using (var repo = new LibGit2Sharp.Repository(cache))
+            repo.Config.Unset("core.symlinks", LibGit2Sharp.ConfigurationLevel.Local);
+        File.WriteAllText(Path.Combine(cache, "marker.txt"), "stale");
+
+        var result = Assert.Single(_service.Update());
+
+        Assert.True(result.Succeeded);
+        Assert.False(File.Exists(Path.Combine(cache, "marker.txt")));
+        using var after = new LibGit2Sharp.Repository(cache);
+        Assert.False(after.Config.Get<bool>("core.symlinks").Value);
+    }
+
+    /// <summary>Commits a symbolic link straight into the object database, so the test runs on any OS.</summary>
+    private static void CommitSymlink(string work, string path, string target)
+    {
+        using var repo = new LibGit2Sharp.Repository(work);
+        var blob = repo.ObjectDatabase.CreateBlob(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(target)));
+        var tree = LibGit2Sharp.TreeDefinition.From(repo.Head.Tip);
+        tree.Add(path, blob, LibGit2Sharp.Mode.SymbolicLink);
+        var sig = new LibGit2Sharp.Signature(Author.Name, Author.Email, DateTimeOffset.UtcNow);
+        var commit = repo.ObjectDatabase.CreateCommit(sig, sig, "add link", repo.ObjectDatabase.CreateTree(tree), [repo.Head.Tip], prettifyMessage: true);
+        repo.Refs.UpdateTarget(repo.Refs.Head.ResolveToDirectReference(), commit.Id);
     }
 
     // ── update ───────────────────────────────────────────────────────────────
@@ -276,8 +366,8 @@ public class SubscriptionServiceTests : IDisposable
     [Fact]
     public void BuildAggregate_ReportsUnfetchedSubscription_AsFailure()
     {
-        _service.Add(Alice());
-        GitTestHelpers.DeleteDirectory(_service.CachePathFor("alice"));
+        var sub = _service.Add(Alice()).Subscription;
+        GitTestHelpers.DeleteDirectory(_service.CachePathFor(sub));
 
         var agg = _service.BuildAggregate(InstanceContentReader.Open(_local));
 

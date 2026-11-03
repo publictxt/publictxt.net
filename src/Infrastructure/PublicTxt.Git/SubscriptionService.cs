@@ -12,15 +12,19 @@ public sealed record SubscriptionUpdateResult(Subscription Subscription, string 
 }
 
 /// <summary>
-/// Manages the local caches behind an instance's subscriptions: one read-only clone per subscription
-/// under <c>&lt;instance&gt;/.publictxt/subscriptions/&lt;name&gt;</c>, git-ignored so the aggregate view is
-/// computed from caches rather than committed into the instance. Also serves as the
+/// Manages the local caches behind an instance's subscriptions: one read-only checkout per repository and
+/// branch under <c>&lt;instance&gt;/remotes/&lt;host&gt;/&lt;owner&gt;/&lt;repo&gt;</c> (see <see cref="RemoteCacheLayout"/>),
+/// git-ignored so the aggregate view is computed from caches rather than committed into the instance.
+/// Subscriptions to the same repository and branch share a checkout. Also serves as the
 /// <see cref="ISubscriptionContentSource"/> for <see cref="AggregateCatalog"/>.
 /// </summary>
 public sealed class SubscriptionService : ISubscriptionContentSource
 {
-    public const string CacheRelativeDirectory = ".publictxt/subscriptions";
-    private const string IgnoreEntry = ".publictxt/";
+    public const string CacheRelativeDirectory = RemoteCacheLayout.DirectoryName;
+    private const string IgnoreEntry = "/" + RemoteCacheLayout.DirectoryName + "/";
+
+    /// <summary>Where caches lived before <see cref="CacheRelativeDirectory"/>; removed on the next add or update.</summary>
+    private const string LegacyCacheRelativeDirectory = ".publictxt/subscriptions";
 
     private readonly string _rootPath;
     private readonly IGitCredentials? _credentials;
@@ -35,9 +39,14 @@ public sealed class SubscriptionService : ISubscriptionContentSource
         _parser = parser ?? MarkdownContentParser.Default;
     }
 
-    public string CacheDirectory => Path.Combine(_rootPath, ".publictxt", "subscriptions");
+    public string CacheDirectory => Path.Combine(_rootPath, CacheRelativeDirectory);
 
-    public string CachePathFor(string subscriptionName) => Path.Combine(CacheDirectory, subscriptionName);
+    /// <summary>Absolute path of the checkout behind <paramref name="subscription"/>.</summary>
+    public string CachePathFor(Subscription subscription)
+    {
+        ArgumentNullException.ThrowIfNull(subscription);
+        return Path.Combine([CacheDirectory, .. RemoteCacheLayout.Segments(subscription.RemoteUrl, subscription.Branch)]);
+    }
 
     // ── list / add / remove ──────────────────────────────────────────────────
 
@@ -69,19 +78,27 @@ public sealed class SubscriptionService : ISubscriptionContentSource
         existing.Add(subscription);
         _store.Save(_rootPath, existing);
         EnsureIgnored();
+        RemoveLegacyCaches();
         return new SubscriptionUpdateResult(subscription, sha, Changed: true);
     }
 
-    /// <summary>Removes the subscription and deletes its cache. Returns false if no such subscription.</summary>
+    /// <summary>
+    /// Removes the subscription and deletes its cache unless another subscription shares it.
+    /// Returns false if no such subscription.
+    /// </summary>
     public bool Remove(string name)
     {
         var existing = List().ToList();
-        var removed = existing.RemoveAll(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
-        if (removed == 0)
+        var removed = existing.Where(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (removed.Count == 0)
             return false;
 
+        existing.RemoveAll(removed.Contains);
         _store.Save(_rootPath, existing);
-        DeleteCache(name);
+
+        var stillUsed = existing.Select(CachePathFor).ToHashSet(StringComparer.Ordinal);
+        foreach (var path in removed.Select(CachePathFor).Where(p => !stillUsed.Contains(p)).Distinct())
+            DeleteCache(path);
         return true;
     }
 
@@ -117,12 +134,13 @@ public sealed class SubscriptionService : ISubscriptionContentSource
 
         _store.Save(_rootPath, subs);
         EnsureIgnored();
+        RemoveLegacyCaches();
         return results;
     }
 
     /// <summary>True when the subscription's cache has been cloned.</summary>
     public bool IsCached(Subscription subscription) =>
-        new ExternalRepository(CachePathFor(subscription.Name)).IsInitialized;
+        new ExternalRepository(CachePathFor(subscription)).IsInitialized;
 
     // ── content ──────────────────────────────────────────────────────────────
 
@@ -133,7 +151,7 @@ public sealed class SubscriptionService : ISubscriptionContentSource
     public IEnumerable<ContentItem> Enumerate(Subscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
-        var cache = CachePathFor(subscription.Name);
+        var cache = CachePathFor(subscription);
         if (!new ExternalRepository(cache).IsInitialized)
             throw new InvalidOperationException($"Subscription '{subscription.Name}' has not been fetched yet; run update.");
 
@@ -164,13 +182,35 @@ public sealed class SubscriptionService : ISubscriptionContentSource
 
     private string UpdateCache(Subscription sub)
     {
-        var repo = new ExternalRepository(CachePathFor(sub.Name), sub.RemoteUrl, _credentials);
+        var repo = new ExternalRepository(CachePathFor(sub), sub.RemoteUrl, _credentials);
         return repo.UpdateToBranch(sub.RemoteUrl, sub.Branch);
     }
 
-    private void DeleteCache(string name)
+    /// <summary>Deletes a checkout, then any parent folders it leaves empty up to <see cref="CacheDirectory"/>.</summary>
+    private void DeleteCache(string path)
     {
-        var path = CachePathFor(name);
+        DeleteTree(path);
+        for (var dir = Path.GetDirectoryName(path);
+             dir is not null && dir.Length > CacheDirectory.Length && dir.StartsWith(CacheDirectory, StringComparison.Ordinal)
+                 && Directory.Exists(dir) && !Directory.EnumerateFileSystemEntries(dir).Any();
+             dir = Path.GetDirectoryName(dir))
+        {
+            Directory.Delete(dir);
+        }
+    }
+
+    /// <summary>Deletes the pre-<c>remotes/</c> cache folder, and <c>.publictxt</c> if that leaves it empty.</summary>
+    private void RemoveLegacyCaches()
+    {
+        var legacy = Path.Combine(_rootPath, LegacyCacheRelativeDirectory.Replace('/', Path.DirectorySeparatorChar));
+        DeleteTree(legacy);
+        var parent = Path.GetDirectoryName(legacy)!;
+        if (Directory.Exists(parent) && !Directory.EnumerateFileSystemEntries(parent).Any())
+            Directory.Delete(parent);
+    }
+
+    private static void DeleteTree(string path)
+    {
         if (!Directory.Exists(path)) return;
 
         // Git object files are read-only on Windows; clear attributes before deleting.
@@ -179,12 +219,12 @@ public sealed class SubscriptionService : ISubscriptionContentSource
         Directory.Delete(path, recursive: true);
     }
 
-    /// <summary>Adds <c>.publictxt/</c> to the instance's <c>.gitignore</c> if it is not already ignored.</summary>
+    /// <summary>Adds <c>/remotes/</c> to the instance's <c>.gitignore</c> if it is not already ignored.</summary>
     private void EnsureIgnored()
     {
         var ignore = Path.Combine(_rootPath, ".gitignore");
         var lines = File.Exists(ignore) ? File.ReadAllLines(ignore) : [];
-        if (lines.Any(l => l.Trim() is IgnoreEntry or ".publictxt"))
+        if (lines.Any(l => l.Trim().Trim('/') == RemoteCacheLayout.DirectoryName))
             return;
 
         var content = lines.Length == 0

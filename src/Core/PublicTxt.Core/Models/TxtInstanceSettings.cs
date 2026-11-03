@@ -36,6 +36,8 @@ public class TxtInstanceSettings
         {
             if (!IsValidRelativePath(path))
                 errors.Add($"{name} is not a valid relative path: {path}");
+            else if (OverlapsRemoteCache(path))
+                errors.Add($"{name} must not be the instance root or under '{Subscriptions.RemoteCacheLayout.DirectoryName}/', which holds subscribed content: {path}");
         }
         
         // Check for duplicates
@@ -49,6 +51,15 @@ public class TxtInstanceSettings
         return new ValidationResult(errors);
     }
     
+    // A content folder at the root or under remotes/ would read subscribed checkouts as local content.
+    private static bool OverlapsRemoteCache(string path)
+    {
+        var p = Instances.InstanceLayout.Normalise(path);
+        const string remotes = Subscriptions.RemoteCacheLayout.DirectoryName;
+        return p is "" or "." || p.Equals(remotes, StringComparison.OrdinalIgnoreCase)
+            || p.StartsWith(remotes + "/", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool IsValidRelativePath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))

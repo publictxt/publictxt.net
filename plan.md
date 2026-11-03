@@ -119,7 +119,7 @@ Goal from spec: subscribe to a remote PublicTxt repo with simple filters. Landed
 
 - [x] **Subscription model** (`Core.Subscriptions.Subscription`): name, remote URL, optional branch, filter, added/updated timestamps, last commit SHA.
 - [x] **`SubscriptionFilter`**: content types, include/exclude path globs, include/exclude tags. Criteria ANDed, values ORed. `MatchesPath` pre-check avoids parsing files that cannot match.
-- [x] **Local representation decision**: separate read-only clone per subscription at `<instance>/.publictxt/subscriptions/<name>`, git-ignored (the service adds the ignore entry). Aggregate is computed, never committed. `ExternalRepository.UpdateToBranch` hard-resets the cache, so force pushes and branch switches are harmless.
+- [x] **Local representation decision**: separate read-only checkout per repository and branch at `<instance>/remotes/<host>/<owner>/<repo>[@branch]` (moved from `.publictxt/subscriptions/<name>`, see §4.2), git-ignored (the service adds the ignore entry). Aggregate is computed, never committed. `ExternalRepository.UpdateToBranch` hard-resets the cache, so force pushes and branch switches are harmless.
 - [x] **Aggregate view** (`AggregateCatalog`): local + subscribed items with `Source`, per-source/type/tag queries, timeline, search; a failing subscription is reported, not fatal.
 - [x] **Persistence** at `settings/subscriptions.json` (camelCase, lowercase enums), meant to be committed.
 - [x] CLI: `subscriptions add|remove|list|update` (alias `subs`), `list --all [--search] [--timeline]`, subscription summary in `status`.
@@ -133,6 +133,18 @@ Goal from spec: subscribe to a remote PublicTxt repo with simple filters. Landed
 - [ ] No `subscriptions edit`; changing a filter means remove + add (the cache is re-cloned). Could rewrite the JSON in place instead.
 - [ ] `show` does not accept `<source>:<path>`; subscribed items can only be listed, not shown.
 - [ ] The **v1 success statement** is now testable end to end from the CLI. Real-world use will surface the next priorities better than the plan can.
+
+### 4.2 Browse, follow and fork (aligning with obsidian-publictxt)
+
+Read-only use of the dotnet app: read the local wiki, browse and search external sources, optionally fork pages.
+
+- [x] `RepoUrl.Canonical` in Core, matching the plugin's `canonicalRepoUrl`.
+- [x] Caches moved to `remotes/<host>/<owner>/<repo>[@branch]`, shared per repo and branch; the old `.publictxt/subscriptions/` is deleted on the next add/update. Content paths may not overlap `remotes/`.
+- [x] Cache checkouts are hardened: `core.symlinks=false`, `core.autocrlf=false`; older caches without these settings are re-cloned.
+- [ ] Shared spec (publictext repo): canonical URL, fork provenance keys, follow-list format (`following.md`?). Agree before implementing the follow list.
+- [ ] Follow list per that spec, with state (last seen commit, watched blobs) split from config and git-ignored.
+- [ ] `ExternalRepository`: `Changes(base, head)` and `BlobShaAt(ref, path)` for what's new / watched files / stale forks.
+- [ ] `ForkMeta` (Core) and `ForkService`; `publictxt fork <sub> <path>`.
 
 ---
 
