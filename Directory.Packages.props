@@ -11,7 +11,7 @@
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
 
     <!-- Apps -->
-    <PackageVersion Include="System.CommandLine" Version="2.0.12" />
+    <PackageVersion Include="System.CommandLine" Version="3.0.0" />
 
     <!-- Infrastructure -->
     <PackageVersion Include="LibGit2Sharp" Version="0.32.0" />
